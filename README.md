@@ -124,8 +124,8 @@ graph TD
 Shows function relationships and calls:
 ```mermaid
 graph LR
-    fetchData[fetchData()] --> processData[processData()]
-    processData --> renderUI[renderUI()]
+    fetchData[fetchData] --> processData[processData]
+    processData --> renderUI[renderUI]
 ```
 
 ### 4. Class Diagram
@@ -295,5 +295,3 @@ MIT License - see LICENSE.md for details
 - [ ] GitHub App integration
 
 ---
-
-**Ready for next step.** 
