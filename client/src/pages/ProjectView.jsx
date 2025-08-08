@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import {
   Box,
   Container,
@@ -13,22 +13,22 @@ import {
   Chip,
   Grid,
   Card,
-  CardContent
-} from '@mui/material';
+  CardContent,
+} from "@mui/material";
 import {
   Chat as ChatIcon,
   AccountTree as DiagramIcon,
   Analytics as AnalyticsIcon,
   ArrowBack as BackIcon,
   Folder as FolderIcon,
-  Code as CodeIcon
-} from '@mui/icons-material';
-import axios from 'axios';
+  Code as CodeIcon,
+} from "@mui/icons-material";
+import axios from "axios";
 
 // Import tab components (we'll create basic versions)
-import ChatTab from '../components/ChatTab';
-import DiagramTab from '../components/DiagramTab';
-import AnalysisTab from '../components/AnalysisTab';
+import ChatTab from "../components/ChatTab";
+import DiagramTab from "../components/DiagramTab";
+import AnalysisTab from "../components/AnalysisTab";
 
 const ProjectView = () => {
   const { projectId } = useParams();
@@ -36,7 +36,7 @@ const ProjectView = () => {
   const [currentTab, setCurrentTab] = useState(0);
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (projectId) {
@@ -52,8 +52,8 @@ const ProjectView = () => {
       );
       setProject(response.data);
     } catch (err) {
-      console.error('Failed to load project:', err);
-      setError(err.response?.data?.error || 'Failed to load project');
+      console.error("Failed to load project:", err);
+      setError(err.response?.data?.error || "Failed to load project");
     } finally {
       setLoading(false);
     }
@@ -65,7 +65,7 @@ const ProjectView = () => {
 
   if (loading) {
     return (
-      <Container maxWidth="lg" sx={{ py: 4, textAlign: 'center' }}>
+      <Container maxWidth="lg" sx={{ py: 4, textAlign: "center" }}>
         <CircularProgress size={60} />
         <Typography variant="h6" sx={{ mt: 2 }}>
           Loading project...
@@ -83,7 +83,7 @@ const ProjectView = () => {
         <Button
           variant="contained"
           startIcon={<BackIcon />}
-          onClick={() => navigate('/upload')}
+          onClick={() => navigate("/upload")}
         >
           Back to Upload
         </Button>
@@ -100,7 +100,7 @@ const ProjectView = () => {
         <Button
           variant="contained"
           startIcon={<BackIcon />}
-          onClick={() => navigate('/upload')}
+          onClick={() => navigate("/upload")}
         >
           Back to Upload
         </Button>
@@ -114,16 +114,16 @@ const ProjectView = () => {
       <Box sx={{ mb: 4 }}>
         <Button
           startIcon={<BackIcon />}
-          onClick={() => navigate('/upload')}
+          onClick={() => navigate("/upload")}
           sx={{ mb: 2 }}
         >
           Back to Upload
         </Button>
-        
+
         <Typography variant="h4" gutterBottom fontWeight="bold">
-          {project.name || 'Project Analysis'}
+          {project.name || "Project Analysis"}
         </Typography>
-        
+
         {/* Project Stats */}
         <Grid container spacing={2} sx={{ mb: 3 }}>
           <Grid item>
@@ -134,18 +134,10 @@ const ProjectView = () => {
               variant="outlined"
             />
           </Grid>
-          <Grid item>
-            <Chip
-              icon={<CodeIcon />}
-              label={`${project.totalLines || 0} Lines`}
-              color="secondary"
-              variant="outlined"
-            />
-          </Grid>
           {project.languages && (
             <Grid item>
               <Chip
-                label={`Languages: ${project.languages.join(', ')}`}
+                label={`Languages: ${project.languages.join(", ")}`}
                 variant="outlined"
               />
             </Grid>
@@ -153,7 +145,9 @@ const ProjectView = () => {
           {project.uploadedAt && (
             <Grid item>
               <Chip
-                label={`Uploaded: ${new Date(project.uploadedAt).toLocaleDateString()}`}
+                label={`Uploaded: ${new Date(
+                  project.uploadedAt
+                ).toLocaleDateString()}`}
                 variant="outlined"
               />
             </Grid>
@@ -173,7 +167,7 @@ const ProjectView = () => {
           value={currentTab}
           onChange={handleTabChange}
           variant="fullWidth"
-          sx={{ borderBottom: 1, borderColor: 'divider' }}
+          sx={{ borderBottom: 1, borderColor: "divider" }}
         >
           <Tab
             icon={<ChatIcon />}
@@ -197,13 +191,19 @@ const ProjectView = () => {
       </Paper>
 
       {/* Tab Content */}
-      <Box sx={{ minHeight: '60vh' }}>
-        {currentTab === 0 && <ChatTab projectId={projectId} project={project} />}
-        {currentTab === 1 && <DiagramTab projectId={projectId} project={project} />}
-        {currentTab === 2 && <AnalysisTab projectId={projectId} project={project} />}
+      <Box sx={{ minHeight: "60vh" }}>
+        {currentTab === 0 && (
+          <ChatTab projectId={projectId} project={project} />
+        )}
+        {currentTab === 1 && (
+          <DiagramTab projectId={projectId} project={project} />
+        )}
+        {currentTab === 2 && (
+          <AnalysisTab projectId={projectId} project={project} />
+        )}
       </Box>
     </Container>
   );
 };
 
-export default ProjectView; 
+export default ProjectView;

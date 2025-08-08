@@ -174,7 +174,6 @@ const Home = () => {
                         </Box>
                         <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
                           <Chip size="small" label={`${project.fileCount || 0} files`} />
-                          <Chip size="small" label={`${project.totalLines || 0} lines`} />
                         </Box>
                         <Box sx={{ display: 'flex', alignItems: 'center', color: 'text.secondary' }}>
                           <ScheduleIcon sx={{ fontSize: 16, mr: 0.5 }} />

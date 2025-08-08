@@ -221,7 +221,7 @@ const Projects = () => {
                 <CardContent sx={{ flexGrow: 1 }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
                     <Typography variant="h6" component="h2" sx={{ flexGrow: 1, mr: 1 }}>
-                      {formatFileName(project.fileName)}
+                      {formatFileName(project.name)}
                     </Typography>
                     <IconButton
                       size="small"

@@ -400,7 +400,7 @@ const Upload = () => {
       )}
 
       {/* Information Section */}
-      <Paper sx={{ mt: 4, p: 3, bgcolor: "grey.50" }}>
+      <Paper sx={{ mt: 4, p: 3 }}>
         <Typography variant="h6" gutterBottom>
           What happens after upload?
         </Typography>
