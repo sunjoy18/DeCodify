@@ -3,15 +3,16 @@
  */
 class MermaidService {
   constructor() {
+    // Logical shape types; actual Mermaid syntax is constructed centrally to avoid nesting
     this.nodeShapes = {
-      '.js': '[]',    // Rectangle
-      '.jsx': '()',   // Rounded rectangle  
-      '.ts': '{}',    // Diamond
-      '.tsx': '{()}', // Rounded diamond
-      '.html': '[[]]', // Subroutine
-      '.css': '((()))', // Circle
-      '.vue': '[]',   // Rectangle
-      'default': '[]'
+      '.js': 'square',
+      '.jsx': 'round',
+      '.ts': 'diamond',
+      '.tsx': 'round',
+      '.html': 'subroutine',
+      '.css': 'circle',
+      '.vue': 'square',
+      'default': 'square'
     };
 
     this.edgeTypes = {
@@ -91,7 +92,8 @@ class MermaidService {
     // Add styling
     mermaidDSL += this.generateStyling();
 
-    return mermaidDSL;
+    // Normalize any legacy nested shape artifacts
+    return this.normalizeShapes(mermaidDSL);
   }
 
   /**
@@ -109,17 +111,9 @@ class MermaidService {
       groupNodes.forEach(node => {
         const nodeId = this.sanitizeId(node.id);
         const label = this.generateNodeLabel(node);
-        const shape = this.getNodeShape(node);
-        
-        // Properly quote labels to prevent syntax errors
-        const quotedLabel = `"${label}"`;
-        
-        definitions += `    ${nodeId}${shape.replace('[]', `[${quotedLabel}]`)
-          .replace('()', `(${quotedLabel})`)
-          .replace('{}', `{${quotedLabel}}`)
-          .replace('{()}', `{(${quotedLabel})}`)
-          .replace('[[]]', `[[${quotedLabel}]]`)
-          .replace('((()))', `(((${quotedLabel})))`)}\n`;
+        const shapeType = this.getNodeShape(node);
+        const nodeSyntax = this.formatNodeByShape(label, shapeType);
+        definitions += `    ${nodeId}${nodeSyntax}\n`;
       });
 
       if (directory && groupByDirectory) {
@@ -140,7 +134,7 @@ class MermaidService {
       const fromId = this.sanitizeId(edge.from);
       const toId = this.sanitizeId(edge.to);
       const edgeType = this.edgeTypes[edge.type] || this.edgeTypes.default;
-      const label = edge.label ? `|${edge.label}|` : '';
+      const label = edge.label ? `|${this.sanitizeEdgeLabel(edge.label)}|` : '';
       
       definitions += `  ${fromId} ${edgeType}${label} ${toId}\n`;
     });
@@ -210,7 +204,7 @@ class MermaidService {
     }
 
     // Ensure label is not too long and contains only safe characters
-    return label.substring(0, 30).replace(/[^a-zA-Z0-9\s\-_\[\],]/g, '');
+    return label.substring(0, 60).replace(/[^a-zA-Z0-9\s\-_\[\],\.]/g, '');
   }
 
   /**
@@ -228,6 +222,39 @@ class MermaidService {
       .replace(/^_+/, '') // Remove leading underscores
       .replace(/_+$/, '') // Remove trailing underscores
       .substring(0, 50) || 'id'; // Limit length and ensure non-empty
+  }
+
+  /**
+   * Sanitize edge label text for Mermaid
+   */
+  sanitizeEdgeLabel(label) {
+    return String(label)
+      .replace(/[\n\r\t]/g, ' ')
+      .replace(/[|]/g, '/')
+      .replace(/[{}\[\]()]/g, '')
+      .trim()
+      .substring(0, 50);
+  }
+
+  /**
+   * Build Mermaid node syntax by shape type without nested shapes.
+   */
+  formatNodeByShape(label, shapeType) {
+    const quotedLabel = `"${label}"`;
+    switch (shapeType) {
+      case 'round':
+        return `(${quotedLabel})`;
+      case 'circle':
+        return `(((${quotedLabel})))`;
+      case 'subroutine':
+        return `[[${quotedLabel}]]`;
+      case 'diamond':
+        // Mermaid decision shape uses curly braces
+        return `{${quotedLabel}}`;
+      case 'square':
+      default:
+        return `[${quotedLabel}]`;
+    }
   }
 
   /**
@@ -348,7 +375,7 @@ class MermaidService {
       mermaidDSL += `  class ${nodeId} component\n`;
     });
 
-    return mermaidDSL;
+    return this.normalizeShapes(mermaidDSL);
   }
 
   /**
@@ -425,7 +452,7 @@ class MermaidService {
       mermaidDSL += `  class ${nodeId} ${className}\n`;
     });
 
-    return mermaidDSL;
+    return this.normalizeShapes(mermaidDSL);
   }
 
   /**
@@ -480,7 +507,7 @@ class MermaidService {
       mermaidDSL += '  }\n';
     }
 
-    return mermaidDSL;
+    return this.normalizeShapes(mermaidDSL);
   }
 
   /**
@@ -516,7 +543,7 @@ class MermaidService {
       }
     }
 
-    return mermaidDSL;
+    return this.normalizeShapes(mermaidDSL);
   }
 
   /**
@@ -548,10 +575,35 @@ class MermaidService {
       }
     }
 
+    // Detect nested shape artifacts like {("label")} or [("label")]
+    const nestedShapePatterns = [
+      /\{\((\".*?\")\)\}/,
+      /\[\((\".*?\")\)\]/,
+      /\(\[(\".*?\")\]\)/,
+      /\{\[(\".*?\")\]\}/,
+      /\(\{(\".*?\")\}\)/
+    ];
+    if (nestedShapePatterns.some((re) => re.test(dsl))) {
+      errors.push('Nested shape tokens detected');
+    }
+
     return {
       isValid: errors.length === 0,
       errors
     };
+  }
+
+  /**
+   * Normalize legacy nested shape patterns by collapsing to a single shape
+   */
+  normalizeShapes(dsl) {
+    let out = dsl;
+    out = out.replace(/\{\((\".*?\")\)\}/g, '($1)');
+    out = out.replace(/\[\((\".*?\")\)\]/g, '($1)');
+    out = out.replace(/\(\[(\".*?\")\]\)/g, '($1)');
+    out = out.replace(/\{\[(\".*?\")\]\}/g, '[$1]');
+    out = out.replace(/\(\{(\".*?\")\}\)/g, '($1)');
+    return out;
   }
 }
 

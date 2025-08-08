@@ -39,6 +39,13 @@ const MermaidDiagram = ({
         const diagramId = `mermaid-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         
         // Validate and render
+        // Pre-validate: try parsing to catch syntax errors early
+        try {
+          await mermaid.parse(definition);
+        } catch (parseErr) {
+          throw new Error(parseErr?.str || parseErr?.message || 'Mermaid parse error');
+        }
+
         const { svg } = await mermaid.render(diagramId, definition);
         diagramRef.current.innerHTML = svg;
         

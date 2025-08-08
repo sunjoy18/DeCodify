@@ -96,6 +96,97 @@ router.post('/project/:projectId', async (req, res) => {
 });
 
 /**
+ * Stream chat response tokens for a project's codebase (SSE)
+ */
+router.post('/project/:projectId/stream', async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const { message, conversationHistory = [] } = req.body || {};
+
+    if (!message || message.trim().length === 0) {
+      res.status(400).json({ error: 'Message is required' });
+      return;
+    }
+
+    // Initialize OpenAI components with streaming enabled via per-call callbacks
+    initializeOpenAI();
+
+    // Load or create vector store for the project
+    let vectorStore = projectVectorStores.get(projectId);
+    if (!vectorStore) {
+      vectorStore = await createProjectVectorStore(projectId);
+      if (!vectorStore) {
+        res.status(404).json({ error: 'Project not found or no content to analyze' });
+        return;
+      }
+      projectVectorStores.set(projectId, vectorStore);
+    }
+
+    // Configure headers for Server-Sent Events
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders?.();
+
+    let accumulatedText = '';
+
+    // Create an LLM instance with streaming callbacks
+    const streamingLLM = new ChatOpenAI({
+      openAIApiKey: process.env.OPENAI_API_KEY,
+      modelName: 'gpt-4',
+      temperature: 0.7,
+      streaming: true,
+      callbacks: [
+        {
+          handleLLMNewToken(token) {
+            accumulatedText += token;
+            // SSE data event per token chunk
+            res.write(`data: ${token}\n\n`);
+          },
+          handleLLMError(err) {
+            res.write(`event: error\n`);
+            res.write(`data: ${JSON.stringify({ message: err.message })}\n\n`);
+          }
+        }
+      ]
+    });
+
+    // Create retrieval chain with the streaming LLM
+    const chain = RetrievalQAChain.fromLLM(
+      streamingLLM,
+      vectorStore.asRetriever({ k: 5 }),
+      { prompt: createCodebasePrompt() }
+    );
+
+    // Execute the chain (tokens will be streamed via callbacks)
+    await chain.call({
+      query: message,
+      chat_history: formatConversationHistory(conversationHistory)
+    });
+
+    // Signal completion
+    res.write('event: done\n');
+    res.write('data: [DONE]\n\n');
+    res.end();
+  } catch (error) {
+    console.error('Chat stream error:', error);
+    try {
+      // Try to emit error over SSE channel if headers already sent
+      if (!res.headersSent) {
+        res.setHeader('Content-Type', 'application/json');
+        res.status(500).json({ error: 'Failed to process chat message', details: error.message });
+      } else {
+        res.write('event: error\n');
+        res.write(`data: ${JSON.stringify({ message: error.message })}\n\n`);
+        res.end();
+      }
+    } catch {
+      // Ignore secondary errors
+    }
+  }
+});
+
+/**
  * Get project context information
  */
 router.get('/context/:projectId', async (req, res) => {

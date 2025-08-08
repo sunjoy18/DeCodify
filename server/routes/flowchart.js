@@ -72,6 +72,20 @@ router.get('/dependency/:projectId', async (req, res) => {
     // Validate the generated DSL
     const validation = mermaidService.validateMermaidDSL(mermaidDSL);
 
+    // If invalid, provide a safe fallback diagram with error info
+    if (!validation.isValid) {
+      const safe = `graph TD\n  A[\"Diagram Generation Error\"] --> B[\"Invalid Mermaid detected\"]\n  B --> C[\"Fallback diagram shown\"]\n  classDef error fill:#ff6b6b,stroke:#c92a2a,color:#fff\n  class A,B,C error`;
+      return res.json({
+        success: true,
+        mermaidDSL: safe,
+        validation,
+        options,
+        nodeCount: projectData.dependencyGraph.nodes.length,
+        edgeCount: projectData.dependencyGraph.edges.length,
+        note: 'Returned safe fallback due to invalid DSL'
+      });
+    }
+
     res.json({
       success: true,
       mermaidDSL,
@@ -110,6 +124,11 @@ router.get('/components/:projectId', async (req, res) => {
 
     // Validate the generated DSL
     const validation = mermaidService.validateMermaidDSL(mermaidDSL);
+
+    if (!validation.isValid) {
+      const safe = `graph TD\n  A[\"Diagram Generation Error\"] --> B[\"Invalid Mermaid detected\"]\n  B --> C[\"Fallback diagram shown\"]`;
+      return res.json({ success: true, mermaidDSL: safe, validation, componentCount: 0, note: 'Fallback due to invalid DSL' });
+    }
 
     // Count components
     const componentCount = projectData.parseResults.reduce((total, file) => {
@@ -152,6 +171,10 @@ router.get('/functions/:projectId', async (req, res) => {
 
     // Validate the generated DSL
     const validation = mermaidService.validateMermaidDSL(mermaidDSL);
+    if (!validation.isValid) {
+      const safe = `graph TD\n  A[\"Diagram Generation Error\"] --> B[\"Invalid Mermaid detected\"]`;
+      return res.json({ success: true, mermaidDSL: safe, validation, functionCount: 0, note: 'Fallback due to invalid DSL' });
+    }
 
     // Count functions
     const functionCount = projectData.parseResults.reduce((total, file) => {
@@ -194,6 +217,10 @@ router.get('/classes/:projectId', async (req, res) => {
 
     // Validate the generated DSL
     const validation = mermaidService.validateMermaidDSL(mermaidDSL);
+    if (!validation.isValid) {
+      const safe = `classDiagram\n  class Error {\n    +message \"Invalid Mermaid detected\"\n  }`;
+      return res.json({ success: true, mermaidDSL: safe, validation, classCount: 0, note: 'Fallback due to invalid DSL' });
+    }
 
     // Count classes
     const classCount = projectData.parseResults.reduce((total, file) => {
@@ -238,6 +265,10 @@ router.get('/sequence/:projectId', async (req, res) => {
 
     // Validate the generated DSL
     const validation = mermaidService.validateMermaidDSL(mermaidDSL);
+    if (!validation.isValid) {
+      const safe = `sequenceDiagram\n  participant A as Error\n  A->>A: Invalid Mermaid detected`;
+      return res.json({ success: true, mermaidDSL: safe, validation, targetComponent: component, note: 'Fallback due to invalid DSL' });
+    }
 
     res.json({
       success: true,

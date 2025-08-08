@@ -40,7 +40,14 @@ const Navbar = () => {
   ];
 
   return (
-    <AppBar position="static" elevation={1}>
+    <AppBar position="static" elevation={1}
+      sx={{
+        background: 'rgba(17, 25, 40, 0.6)',
+        borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+        backdropFilter: 'blur(8px) saturate(130%)',
+        WebkitBackdropFilter: 'blur(8px) saturate(130%)'
+      }}
+    >
       <Toolbar>
         {/* Logo */}
         <Typography

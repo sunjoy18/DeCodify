@@ -55,7 +55,9 @@ function App() {
           mt: 'auto',
           backgroundColor: '#f5f5f5',
           borderTop: 1,
-          borderColor: 'divider'
+          borderColor: 'divider',
+          backgroundColor: 'background.paper',
+          backdropFilter: 'blur(8px) saturate(120%)'
         }}
       >
         <Typography variant="body2" color="text.secondary" align="center">

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   Box,
   Paper,
@@ -39,6 +39,7 @@ import axios from "axios";
 const AnalysisTab = ({ projectId, project }) => {
   const [metrics, setMetrics] = useState(null);
   const [loading, setLoading] = useState(true);
+  const codeSeeUrl = import.meta.env.VITE_CODESEE_MAP_URL || null;
 
   // Utility function to clean up file paths
   const formatFilePath = (filePath) => {
@@ -113,7 +114,7 @@ const AnalysisTab = ({ projectId, project }) => {
       const componentsData = componentsRes.data.components || [];
       const dependenciesData = dependenciesRes.data.internalDependencies || [];
 
-      setMetrics({
+       setMetrics({
         summary: {
           totalFiles: metricsRes.data.summary?.totalFiles || 5, // From demo project
           totalLines:
@@ -130,11 +131,7 @@ const AnalysisTab = ({ projectId, project }) => {
             Math.max(60, 100 - functionsData.length * 2)
           ), // Simple calculation
         },
-        fileTypes: metricsRes.data.fileTypes || [
-          { extension: ".jsx", count: 2, percentage: 40 },
-          { extension: ".js", count: 2, percentage: 40 },
-          { extension: ".css", count: 1, percentage: 20 },
-        ],
+        fileTypes: Object.entries(metricsRes.data.fileTypes || {}).map(([type, count]) => ({ type, count, percentage: 0 })),
         functions: functionsData,
         components: componentsData,
         issues:
@@ -151,6 +148,7 @@ const AnalysisTab = ({ projectId, project }) => {
               })) || []
           ) || [],
         dependencies: dependenciesData,
+        dependencyGraph: dependenciesRes.data.dependencyGraph || [],
       });
     } catch (error) {
       console.error("Failed to load analysis data:", error);
@@ -215,6 +213,36 @@ const AnalysisTab = ({ projectId, project }) => {
     }
   };
 
+ 
+
+  // Compute derived summaries
+  const topComplexFunctions = useMemo(() => {
+    if (!metrics) return [];
+    return [...metrics.functions]
+      .sort((a, b) => (b.complexity || 0) - (a.complexity || 0))
+      .slice(0, 5);
+  }, [metrics]);
+
+  const topDependencyHubs = useMemo(() => {
+    if (!metrics) return [];
+    // Build counts from dependencies list if available
+    const counts = new Map();
+    metrics.dependencies.forEach((d) => {
+      counts.set(d.from, (counts.get(d.from) || 0) + 1);
+      counts.set(d.to, (counts.get(d.to) || 0));
+    });
+    return Array.from(counts.entries())
+      .map(([file, outgoing]) => ({ file, outgoing }))
+      .sort((a, b) => b.outgoing - a.outgoing)
+      .slice(0, 5);
+  }, [metrics]);
+
+  const fileTypesWithPct = useMemo(() => {
+    if (!metrics || !metrics.fileTypes) return [];
+    const total = metrics.fileTypes.reduce((s, ft) => s + (ft.count || 0), 0) || 1;
+    return metrics.fileTypes.map((ft) => ({ ...ft, percentage: (100 * (ft.count || 0)) / total }));
+  }, [metrics]);
+
   if (loading) {
     return (
       <Box sx={{ p: 3, textAlign: "center" }}>
@@ -231,7 +259,7 @@ const AnalysisTab = ({ projectId, project }) => {
       {/* Summary Cards */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
         <Grid item xs={12} sm={6} md={3}>
-          <Card>
+          <Card sx={{ color: '#e6edf3' }}>
             <CardContent sx={{ textAlign: "center" }}>
               <CodeIcon sx={{ fontSize: 40, color: "primary.main", mb: 1 }} />
               <Typography variant="h4" color="primary.main">
@@ -245,7 +273,7 @@ const AnalysisTab = ({ projectId, project }) => {
         </Grid>
 
         <Grid item xs={12} sm={6} md={3}>
-          <Card>
+          <Card sx={{ color: '#e6edf3' }}>
             <CardContent sx={{ textAlign: "center" }}>
               <TrendingUpIcon
                 sx={{ fontSize: 40, color: "secondary.main", mb: 1 }}
@@ -261,7 +289,7 @@ const AnalysisTab = ({ projectId, project }) => {
         </Grid>
 
         <Grid item xs={12} sm={6} md={3}>
-          <Card>
+          <Card sx={{ color: '#e6edf3' }}>
             <CardContent sx={{ textAlign: "center" }}>
               <FunctionIcon
                 sx={{ fontSize: 40, color: "success.main", mb: 1 }}
@@ -277,7 +305,7 @@ const AnalysisTab = ({ projectId, project }) => {
         </Grid>
 
         <Grid item xs={12} sm={6} md={3}>
-          <Card>
+          <Card sx={{ color: '#e6edf3' }}>
             <CardContent sx={{ textAlign: "center" }}>
               <AssessmentIcon
                 sx={{ fontSize: 40, color: "warning.main", mb: 1 }}
@@ -294,12 +322,12 @@ const AnalysisTab = ({ projectId, project }) => {
       </Grid>
 
       {/* File Types Distribution */}
-      <Paper sx={{ p: 3, mb: 3 }}>
+      <Paper sx={{ p: 3, mb: 3, border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 12px 40px rgba(0,0,0,0.5)', backdropFilter: 'blur(10px) saturate(120%)' }}>
         <Typography variant="h6" gutterBottom>
           File Type Distribution
         </Typography>
         <Grid container spacing={2}>
-          {metrics.fileTypes.map((fileType, index) => (
+          {fileTypesWithPct.map((fileType, index) => (
             <Grid item xs={12} sm={6} md={3} key={index}>
               <Box>
                 <Box
@@ -484,6 +512,77 @@ const AnalysisTab = ({ projectId, project }) => {
           </AccordionDetails>
         </Accordion>
       </Box>
+
+      {/* Insights & CodeSee */}
+      <Grid container spacing={3} sx={{ mt: 1 }}>
+        <Grid item xs={12} md={6}>
+          <Paper sx={{ p: 2 }}>
+            <Typography variant="h6" gutterBottom>
+              Top Complexity Hotspots
+            </Typography>
+            {topComplexFunctions.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">No functions detected.</Typography>
+            ) : (
+              <List>
+                {topComplexFunctions.map((f, i) => (
+                  <ListItem key={i}>
+                    <ListItemText
+                      primary={`${f.name} — complexity ${f.complexity}`}
+                      secondary={formatFilePath(f.file)}
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            )}
+          </Paper>
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <Paper sx={{ p: 2 }}>
+            <Typography variant="h6" gutterBottom>
+              Top Dependency Hubs
+            </Typography>
+            {topDependencyHubs.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">No dependencies detected.</Typography>
+            ) : (
+              <List>
+                {topDependencyHubs.map((d, i) => (
+                  <ListItem key={i}>
+                    <ListItemText
+                      primary={formatFilePath(d.file)}
+                      secondary={`Outgoing imports: ${d.outgoing}`}
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            )}
+          </Paper>
+        </Grid>
+
+        {codeSeeUrl && (
+          <Grid item xs={12}>
+            <Paper sx={{ p: 2 }}>
+              <Typography variant="h6" gutterBottom>
+                CodeSee Map
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                Embedded CodeSee map of your repository (set VITE_CODESEE_MAP_URL to enable).
+              </Typography>
+              <Box sx={{ position: 'relative', pt: '56.25%' }}>
+                <Box sx={{ position: 'absolute', inset: 0 }}>
+                  <iframe
+                    title="CodeSee Map"
+                    src={codeSeeUrl}
+                    width="100%"
+                    height="100%"
+                    style={{ border: 0 }}
+                    allow="clipboard-read; clipboard-write;"
+                  />
+                </Box>
+              </Box>
+            </Paper>
+          </Grid>
+        )}
+      </Grid>
 
       {/* Recommendations */}
       <Alert severity="info" sx={{ mt: 3 }}>

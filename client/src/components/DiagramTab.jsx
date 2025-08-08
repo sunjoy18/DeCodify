@@ -175,7 +175,7 @@ const DiagramTab = ({ projectId, project }) => {
       </Paper>
 
       {/* Diagram Display */}
-      <Paper sx={{ p: 2, minHeight: '500px' }}>
+      <Paper sx={{ p: 2, minHeight: '500px', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 12px 40px rgba(0,0,0,0.5)', backdropFilter: 'blur(10px) saturate(120%)' }}>
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
             <Box sx={{ textAlign: 'center' }}>
