@@ -29,10 +29,8 @@ class GeminiChat {
   async generateResponse(prompt, context = "") {
     try {
       const fullPrompt = this.buildPrompt(prompt, context);
-      console.log("Full prompt:", fullPrompt);
       const result = await this.model.generateContent(fullPrompt);
       const response = await result.response;
-      console.log("Response:", response.text());
       return response.text();
     } catch (error) {
       console.error("Google Gemini API error:", error);
@@ -43,18 +41,16 @@ class GeminiChat {
   async generateStreamResponse(prompt, context = "", onToken) {
     try {
       const fullPrompt = this.buildPrompt(prompt, context);
-      console.log("Full prompt:", fullPrompt);
       const result = await this.model.generateContentStream(fullPrompt);
       let fullResponse = "";
-        
-        for await (const chunk of result.stream) {
-          const chunkText = chunk.text();
-          if (chunkText) {
-            fullResponse += chunkText;
+
+      for await (const chunk of result.stream) {
+        const chunkText = chunk.text();
+        if (chunkText) {
+          fullResponse += chunkText;
           if (onToken) onToken(chunkText);
         }
       }
-      console.log("Full response:", fullResponse);
       return fullResponse;
     } catch (error) {
       console.error("Google Gemini API error:", error);
@@ -117,11 +113,6 @@ router.post("/project/:projectId", async (req, res) => {
       projectId
     );
 
-    console.log('Referenced files found:', referencedFiles.length);
-    referencedFiles.forEach((file, index) => {
-      console.log(`File ${index + 1}: ${file.path} (${file.content.length} chars)`);
-    });
-
     // Build context with conversation history and referenced files
     const fullContext = buildFullContext(
       context,
@@ -129,9 +120,6 @@ router.post("/project/:projectId", async (req, res) => {
       cleanMessage,
       referencedFiles
     );
-
-    console.log('Full context length:', fullContext.length);
-    console.log('Context preview:', fullContext.substring(0, 500) + '...');
 
     // Generate response
     const response = await chat.generateResponse(cleanMessage, fullContext);
@@ -145,7 +133,7 @@ router.post("/project/:projectId", async (req, res) => {
     });
   } catch (error) {
     console.error("Chat error:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: "Failed to process chat message",
       details: error.message,
     });
@@ -216,12 +204,10 @@ router.post("/project/:projectId/stream", async (req, res) => {
       // Try to emit error over SSE channel if headers already sent
       if (!res.headersSent) {
         res.setHeader("Content-Type", "application/json");
-        res
-          .status(500)
-          .json({
-            error: "Failed to process chat message",
-            details: error.message,
-          });
+        res.status(500).json({
+          error: "Failed to process chat message",
+          details: error.message,
+        });
       } else {
         res.write("event: error\n");
         res.write(`data: ${JSON.stringify({ message: error.message })}\n\n`);
@@ -239,7 +225,7 @@ router.post("/project/:projectId/stream", async (req, res) => {
 router.get("/context/:projectId", async (req, res) => {
   try {
     const { projectId } = req.params;
-    
+
     // Load project data
     const projectData = await loadProjectData(projectId);
     if (!projectData) {
@@ -256,7 +242,7 @@ router.get("/context/:projectId", async (req, res) => {
     });
   } catch (error) {
     console.error("Context error:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: "Failed to load project context",
       details: error.message,
     });
@@ -368,7 +354,7 @@ router.get("/:projectId/:filePath(*)", async (req, res) => {
     const decodedFilePath = decodeURIComponent(filePath);
 
     // Get file content using the existing function
-    const content = await getFileContent(projectId, decodedFilePath);
+    const content = await getFileContent(projectId, decodedFilePath, true);
 
     if (content === null) {
       return res.status(404).json({ error: "File not found" });
@@ -381,7 +367,7 @@ router.get("/:projectId/:filePath(*)", async (req, res) => {
     });
   } catch (error) {
     console.error("Get file content error:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: "Failed to get file content",
       details: error.message,
     });
@@ -394,10 +380,10 @@ router.get("/:projectId/:filePath(*)", async (req, res) => {
 router.delete("/project/:projectId", async (req, res) => {
   try {
     const { projectId } = req.params;
-    
+
     // Remove context from memory
     projectContexts.delete(projectId);
-    
+
     res.json({
       success: true,
       message: "Chat history cleared",
@@ -405,7 +391,7 @@ router.delete("/project/:projectId", async (req, res) => {
     });
   } catch (error) {
     console.error("Clear chat error:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: "Failed to clear chat history",
       details: error.message,
     });
@@ -442,8 +428,8 @@ async function createProjectContext(projectId) {
       // Add file overview
       const fileInfo = {
         path: file.filePath,
-          extension: file.extension,
-          size: file.size,
+        extension: file.extension,
+        size: file.size,
         lines: file.lines,
         dependencies: file.dependencies || [],
         exports: file.exports || [],
@@ -473,7 +459,7 @@ async function createProjectContext(projectId) {
             name: cls.name,
             file: file.filePath,
             line: cls.line,
-              superClass: cls.superClass,
+            superClass: cls.superClass,
             content: createClassDocumentContent(cls, file),
           });
         });
@@ -669,9 +655,6 @@ async function extractFileReferences(message, projectId) {
   const fileReferenceRegex = /@([^\s@]+)/g;
   const matches = [...message.matchAll(fileReferenceRegex)];
 
-  console.log('Message:', message);
-  console.log('Found @ references:', matches.length);
-
   if (matches.length === 0) {
     return { cleanMessage: message, referencedFiles: [] };
   }
@@ -683,13 +666,10 @@ async function extractFileReferences(message, projectId) {
     const cleanFilePath = match[1];
     const fullMatch = match[0];
 
-    console.log(`Processing @ reference: ${fullMatch} -> ${cleanFilePath}`);
-
     try {
       // Get file content using the clean path (getFileContent handles the prefix)
       const fileContent = await getFileContent(projectId, cleanFilePath);
       if (fileContent) {
-        console.log(`Successfully loaded file: ${cleanFilePath} (${fileContent.length} chars)`);
         referencedFiles.push({
           path: cleanFilePath, // Store clean path for display
           content: fileContent,
@@ -697,7 +677,10 @@ async function extractFileReferences(message, projectId) {
         });
 
         // Replace @ mention with cleaner reference in message
-        cleanMessage = cleanMessage.replace(fullMatch, `file "${cleanFilePath}"`);
+        cleanMessage = cleanMessage.replace(
+          fullMatch,
+          `file "${cleanFilePath}"`
+        );
       } else {
         // Keep the @ mention if file not found
         console.warn(`File not found: ${cleanFilePath}`);
@@ -707,21 +690,20 @@ async function extractFileReferences(message, projectId) {
     }
   }
 
-  console.log(`Final referenced files: ${referencedFiles.length}`);
   return { cleanMessage, referencedFiles };
 }
 
-async function getFileContent(projectId, filePath) {
+async function getFileContent(projectId, filePath, fullContent = false) {
   try {
     // Normalize the file path - handle both forward and backward slashes
-    const normalizedPath = filePath.replace(/\\/g, '/');
-    
+    const normalizedPath = filePath.replace(/\\/g, "/");
+
     // Remove uploads/projectId/ prefix if it exists (in case it's already included)
     let cleanPath = normalizedPath;
     if (normalizedPath.startsWith(`uploads/${projectId}/`)) {
       cleanPath = normalizedPath.substring(`uploads/${projectId}/`.length);
     }
-    
+
     // Construct the full path to the file
     const uploadsPath = path.join(__dirname, "../uploads", projectId);
     const fullFilePath = path.join(uploadsPath, cleanPath);
@@ -743,21 +725,19 @@ async function getFileContent(projectId, filePath) {
       return null;
     }
 
-    console.log("Resolved path:", resolvedPath);
-
     // Read file content
     const content = await fs.readFile(resolvedPath, "utf8");
 
     // Limit file size to prevent overwhelming the context
+    if (fullContent) {
+      return content;
+    }
     const maxSize = 10000; // 10KB limit
     if (content.length > maxSize) {
       return (
         content.substring(0, maxSize) + "\n\n... (file truncated due to size)"
       );
     }
-
-    console.log("Content length:", content.length);
-
     return content;
   } catch (error) {
     console.error(`Error reading file ${filePath}:`, error);
@@ -769,7 +749,7 @@ function createFileDocumentContent(file) {
   let content = `File: ${file.filePath}\n`;
   content += `Type: ${file.extension}\n`;
   content += `Size: ${file.size} bytes, ${file.lines} lines\n\n`;
-  
+
   if (file.dependencies && file.dependencies.length > 0) {
     content += `Dependencies:\n`;
     file.dependencies.forEach((dep) => {
@@ -809,14 +789,14 @@ function createFunctionDocumentContent(func, file) {
   content += `File: ${file.filePath}\n`;
   content += `Type: ${func.type}\n`;
   content += `Line: ${func.line}\n`;
-  
+
   if (func.params && func.params.length > 0) {
     content += `Parameters: ${func.params.join(", ")}\n`;
   }
-  
+
   if (func.async) content += `Async: true\n`;
   if (func.generator) content += `Generator: true\n`;
-  
+
   return content;
 }
 
@@ -824,11 +804,11 @@ function createClassDocumentContent(cls, file) {
   let content = `Class: ${cls.name}\n`;
   content += `File: ${file.filePath}\n`;
   content += `Line: ${cls.line}\n`;
-  
+
   if (cls.superClass) {
     content += `Extends: ${cls.superClass}\n`;
   }
-  
+
   return content;
 }
 
@@ -837,11 +817,11 @@ function createComponentDocumentContent(comp, file) {
   content += `File: ${file.filePath}\n`;
   content += `Type: ${comp.type}\n`;
   content += `Line: ${comp.line}\n`;
-  
+
   if (comp.props && comp.props.length > 0) {
     content += `Props: ${comp.props.join(", ")}\n`;
   }
-  
+
   return content;
 }
 
@@ -879,7 +859,7 @@ function formatConversationHistory(history) {
   if (!history || history.length === 0) {
     return "No previous conversation.";
   }
-  
+
   return history
     .slice(-5) // Keep only last 5 exchanges
     .map(
@@ -910,7 +890,7 @@ function generateProjectSummary(projectData) {
   // Generate summary statistics
   if (projectData.parseResults) {
     projectData.parseResults.forEach((file) => {
-      context.summary.fileTypes[file.extension] = 
+      context.summary.fileTypes[file.extension] =
         (context.summary.fileTypes[file.extension] || 0) + 1;
       context.summary.totalFunctions += file.functions?.length || 0;
       context.summary.totalClasses += file.classes?.length || 0;
@@ -927,16 +907,16 @@ async function loadProjectData(projectId) {
     "../data/projects",
     `${projectId}.json`
   );
-  
+
   if (await fs.pathExists(filePath)) {
     return await fs.readJson(filePath);
   }
-  
+
   return null;
 }
 
 // Also export the router under files routes
-export default router; 
+export default router;
 
 // Create a separate files router for better organization
 export const filesRouter = router;

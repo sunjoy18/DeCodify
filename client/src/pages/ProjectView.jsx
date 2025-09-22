@@ -132,7 +132,7 @@ const ProjectView = () => {
           sx={{
             borderBottom: 1,
             borderColor: "divider",
-            minHeight: 40, // reduce Tabs container height
+            minHeight: 50, // reduce Tabs container height
           }}
         >
           <Tab
