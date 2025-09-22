@@ -63,10 +63,10 @@ Feel free to ask anything about your project!`,
   // Helper function to clean file paths for display
   const cleanFilePath = (filePath) => {
     // Normalize path separators first
-    const normalizedPath = filePath.replace(/\\/g, '/');
+    const normalizedPath = filePath.replace(/\\/g, "/");
     // Remove uploads/projectId/ prefix from file paths
     const uploadsPattern = /^uploads\/[^\/]+\//;
-    return normalizedPath.replace(uploadsPattern, '');
+    return normalizedPath.replace(uploadsPattern, "");
   };
 
   // Load project files for autocomplete
@@ -78,10 +78,10 @@ Feel free to ask anything about your project!`,
         }/chat/files/${projectId}`
       );
       // Clean file paths for display but keep originals for API calls
-      const files = (response.data.files || []).map(file => ({
+      const files = (response.data.files || []).map((file) => ({
         ...file,
         displayPath: cleanFilePath(file.path),
-        originalPath: file.path
+        originalPath: file.path,
       }));
       setFileOptions(files);
     } catch (error) {
@@ -128,13 +128,18 @@ Feel free to ask anything about your project!`,
   const insertFileReference = (file) => {
     const beforeAt = inputValue.substring(0, currentAtPosition);
     const afterCursor = inputValue.substring(inputRef.current.selectionStart);
-    // Use display path for user-friendly @ mentions
-    const newValue = beforeAt + `@${file.displayPath} ` + afterCursor;
+
+    // Find the next space after @... to know where the mention ends
+    const mentionEnd = inputValue.indexOf(" ", currentAtPosition);
+    const afterMention =
+      mentionEnd !== -1 ? inputValue.substring(mentionEnd) : "";
+
+    const newValue = beforeAt + `@${file.displayPath} ` + afterMention;
 
     setInputValue(newValue);
     setShowFileAutocomplete(false);
 
-    // Focus back to input
+    // Restore focus and cursor position
     setTimeout(() => {
       inputRef.current?.focus();
       const newCursorPosition = beforeAt.length + file.displayPath.length + 2; // +2 for @ and space
