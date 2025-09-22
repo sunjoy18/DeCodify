@@ -1,16 +1,16 @@
-import React from 'react';
-import { Routes, Route } from 'react-router-dom';
-import { Box, AppBar, Toolbar, Typography, Container } from '@mui/material';
-import Home from './pages/Home';
-import ProjectView from './pages/ProjectView';
-import Upload from './pages/Upload';
-import Projects from './pages/Projects';
-import Navbar from './components/Navbar';
-import ErrorBoundary from './components/ErrorBoundary';
+import React from "react";
+import { Routes, Route } from "react-router-dom";
+import { Box, AppBar, Toolbar, Typography, Container } from "@mui/material";
+import Home from "./pages/Home";
+import ProjectView from "./pages/ProjectView";
+import Upload from "./pages/Upload";
+import Projects from "./pages/Projects";
+import Navbar from "./components/Navbar";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 function App() {
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+    <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
       {/* <AppBar position="static" elevation={1}>
         <Toolbar>
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
@@ -24,14 +24,14 @@ function App() {
 
       <Navbar />
 
-      <Container 
-        maxWidth={false} 
-        sx={{ 
-          flexGrow: 1, 
-          display: 'flex', 
-          flexDirection: 'column',
+      <Container
+        maxWidth={false}
+        sx={{
+          flexGrow: 1,
+          display: "flex",
+          flexDirection: "column",
           py: 2,
-          px: { xs: 1, sm: 3 }
+          px: { xs: 1, sm: 3 },
         }}
       >
         <ErrorBoundary>
@@ -40,9 +40,22 @@ function App() {
             <Route path="/upload" element={<Upload />} />
             <Route path="/projects" element={<Projects />} />
             <Route path="/project/:projectId" element={<ProjectView />} />
-            <Route path="/project/:projectId/chat" element={<ProjectView tab="chat" />} />
-            <Route path="/project/:projectId/diagrams" element={<ProjectView tab="diagrams" />} />
-            <Route path="/project/:projectId/analysis" element={<ProjectView tab="analysis" />} />
+            <Route
+              path="/project/:projectId/codebase"
+              element={<ProjectView tab="codebase" />}
+            />
+            <Route
+              path="/project/:projectId/chat"
+              element={<ProjectView tab="chat" />}
+            />
+            <Route
+              path="/project/:projectId/diagrams"
+              element={<ProjectView tab="diagrams" />}
+            />
+            <Route
+              path="/project/:projectId/analysis"
+              element={<ProjectView tab="analysis" />}
+            />
           </Routes>
         </ErrorBoundary>
       </Container>
@@ -52,11 +65,11 @@ function App() {
         sx={{
           py: 2,
           px: 3,
-          mt: 'auto',
+          mt: "auto",
           borderTop: 1,
-          borderColor: 'divider',
-          backgroundColor: 'background.paper',
-          backdropFilter: 'blur(8px) saturate(120%)'
+          borderColor: "divider",
+          backgroundColor: "#f5f5f5",
+          backdropFilter: "blur(8px) saturate(120%)",
         }}
       >
         <Typography variant="body2" color="text.secondary" align="center">
@@ -67,4 +80,4 @@ function App() {
   );
 }
 
-export default App; 
+export default App;

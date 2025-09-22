@@ -22,13 +22,15 @@ import {
   ArrowBack as BackIcon,
   Folder as FolderIcon,
   Code as CodeIcon,
+  FolderOpen as CodebaseIcon,
 } from "@mui/icons-material";
 import axios from "axios";
 
-// Import tab components (we'll create basic versions)
+// Import tab components
 import ChatTab from "../components/ChatTab";
 import DiagramTab from "../components/DiagramTab";
 import AnalysisTab from "../components/AnalysisTab";
+import CodebaseTab from "../components/CodebaseTab";
 
 const ProjectView = () => {
   const { projectId } = useParams();
@@ -170,6 +172,12 @@ const ProjectView = () => {
           sx={{ borderBottom: 1, borderColor: "divider" }}
         >
           <Tab
+            icon={<CodebaseIcon />}
+            label="Codebase"
+            iconPosition="start"
+            sx={{ minHeight: 64 }}
+          />
+          <Tab
             icon={<ChatIcon />}
             label="AI Chat"
             iconPosition="start"
@@ -193,12 +201,15 @@ const ProjectView = () => {
       {/* Tab Content */}
       <Box sx={{ minHeight: "60vh" }}>
         {currentTab === 0 && (
-          <ChatTab projectId={projectId} project={project} />
+          <CodebaseTab projectId={projectId} project={project} />
         )}
         {currentTab === 1 && (
-          <DiagramTab projectId={projectId} project={project} />
+          <ChatTab projectId={projectId} project={project} />
         )}
         {currentTab === 2 && (
+          <DiagramTab projectId={projectId} project={project} />
+        )}
+        {currentTab === 3 && (
           <AnalysisTab projectId={projectId} project={project} />
         )}
       </Box>

@@ -63,6 +63,7 @@ app.get('/health', (req, res) => {
 // API routes
 app.use('/api/upload', uploadRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/files', chatRoutes); // Reuse chat routes for file operations
 app.use('/api/flowchart', flowchartRoutes);
 app.use('/api/analysis', analysisRoutes);
 

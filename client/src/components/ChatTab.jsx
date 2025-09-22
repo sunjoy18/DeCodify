@@ -14,11 +14,16 @@ import {
   ListItemText,
   Chip,
   CircularProgress,
+  Popper,
+  ClickAwayListener,
+  MenuList,
+  MenuItem,
 } from "@mui/material";
 import {
   Send as SendIcon,
   SmartToy as AIIcon,
   Person as PersonIcon,
+  InsertDriveFile as FileIcon,
 } from "@mui/icons-material";
 import axios from "axios";
 
@@ -36,6 +41,8 @@ const ChatTab = ({ projectId, project }) => {
 • "Show me the project structure"
 • "What are the most complex functions?"
 
+💡 **Pro tip**: Use @ to reference specific files (e.g., "@src/App.jsx what does this component do?")
+
 Feel free to ask anything about your project!`,
       timestamp: new Date(),
     },
@@ -44,6 +51,122 @@ Feel free to ask anything about your project!`,
   const [isLoading, setIsLoading] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const eventSourceRef = useRef(null);
+
+  // File autocomplete state
+  const [showFileAutocomplete, setShowFileAutocomplete] = useState(false);
+  const [fileOptions, setFileOptions] = useState([]);
+  const [currentAtPosition, setCurrentAtPosition] = useState(-1);
+  const [filteredFiles, setFilteredFiles] = useState([]);
+  const [selectedFileIndex, setSelectedFileIndex] = useState(0);
+  const inputRef = useRef(null);
+
+  // Helper function to clean file paths for display
+  const cleanFilePath = (filePath) => {
+    // Normalize path separators first
+    const normalizedPath = filePath.replace(/\\/g, '/');
+    // Remove uploads/projectId/ prefix from file paths
+    const uploadsPattern = /^uploads\/[^\/]+\//;
+    return normalizedPath.replace(uploadsPattern, '');
+  };
+
+  // Load project files for autocomplete
+  const loadProjectFiles = async () => {
+    try {
+      const response = await axios.get(
+        `${
+          import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api"
+        }/chat/files/${projectId}`
+      );
+      // Clean file paths for display but keep originals for API calls
+      const files = (response.data.files || []).map(file => ({
+        ...file,
+        displayPath: cleanFilePath(file.path),
+        originalPath: file.path
+      }));
+      setFileOptions(files);
+    } catch (error) {
+      console.error("Failed to load project files:", error);
+    }
+  };
+
+  useEffect(() => {
+    if (projectId) {
+      loadProjectFiles();
+    }
+  }, [projectId]);
+
+  const handleInputChange = (event) => {
+    const value = event.target.value;
+    const cursorPosition = event.target.selectionStart;
+    setInputValue(value);
+
+    // Check for @ symbol and show autocomplete
+    const beforeCursor = value.substring(0, cursorPosition);
+    const atMatch = beforeCursor.match(/@([^\s@]*)$/);
+
+    if (atMatch) {
+      const searchTerm = atMatch[1];
+      setCurrentAtPosition(atMatch.index);
+
+      // Filter files based on search term (use display path for filtering)
+      const filtered = fileOptions
+        .filter(
+          (file) =>
+            file.displayPath.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            file.name.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+        .slice(0, 10); // Limit to 10 results
+
+      setFilteredFiles(filtered);
+      setSelectedFileIndex(0);
+      setShowFileAutocomplete(filtered.length > 0);
+    } else {
+      setShowFileAutocomplete(false);
+    }
+  };
+
+  const insertFileReference = (file) => {
+    const beforeAt = inputValue.substring(0, currentAtPosition);
+    const afterCursor = inputValue.substring(inputRef.current.selectionStart);
+    // Use display path for user-friendly @ mentions
+    const newValue = beforeAt + `@${file.displayPath} ` + afterCursor;
+
+    setInputValue(newValue);
+    setShowFileAutocomplete(false);
+
+    // Focus back to input
+    setTimeout(() => {
+      inputRef.current?.focus();
+      const newCursorPosition = beforeAt.length + file.displayPath.length + 2; // +2 for @ and space
+      inputRef.current?.setSelectionRange(newCursorPosition, newCursorPosition);
+    }, 0);
+  };
+
+  const handleKeyDown = (event) => {
+    if (showFileAutocomplete) {
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        setSelectedFileIndex((prev) =>
+          prev < filteredFiles.length - 1 ? prev + 1 : 0
+        );
+      } else if (event.key === "ArrowUp") {
+        event.preventDefault();
+        setSelectedFileIndex((prev) =>
+          prev > 0 ? prev - 1 : filteredFiles.length - 1
+        );
+      } else if (event.key === "Tab" || event.key === "Enter") {
+        if (filteredFiles[selectedFileIndex]) {
+          event.preventDefault();
+          insertFileReference(filteredFiles[selectedFileIndex]);
+        }
+      } else if (event.key === "Escape") {
+        setShowFileAutocomplete(false);
+      }
+    } else if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      handleSendMessage();
+    }
+  };
 
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isLoading) return;
@@ -57,6 +180,7 @@ Feel free to ask anything about your project!`,
 
     setMessages((prev) => [...prev, userMessage]);
     setInputValue("");
+    setShowFileAutocomplete(false);
     setIsLoading(true);
 
     try {
@@ -180,11 +304,51 @@ Feel free to ask anything about your project!`,
     }
   };
 
-  const handleKeyPress = (event) => {
-    if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
-      handleSendMessage();
-    }
+  const renderFileAutocomplete = () => {
+    if (!showFileAutocomplete || filteredFiles.length === 0) return null;
+
+    return (
+      <Popper
+        open={showFileAutocomplete}
+        anchorEl={inputRef.current}
+        placement="top-start"
+        sx={{ zIndex: 1300, width: inputRef.current?.offsetWidth }}
+      >
+        <Paper
+          sx={{
+            maxHeight: 200,
+            overflow: "auto",
+            border: "1px solid rgba(255,255,255,0.1)",
+            bgcolor: "background.paper",
+          }}
+        >
+          <MenuList dense>
+            {filteredFiles.map((file, index) => (
+              <MenuItem
+                key={file.path}
+                selected={index === selectedFileIndex}
+                onClick={() => insertFileReference(file)}
+                sx={{
+                  fontSize: "0.875rem",
+                  py: 0.5,
+                  px: 1,
+                }}
+              >
+                <FileIcon sx={{ mr: 1, fontSize: "1rem", opacity: 0.7 }} />
+                <Box>
+                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                    {file.name}
+                  </Typography>
+                  <Typography variant="caption" sx={{ opacity: 0.7 }}>
+                    {file.displayPath}
+                  </Typography>
+                </Box>
+              </MenuItem>
+            ))}
+          </MenuList>
+        </Paper>
+      </Popper>
+    );
   };
 
   return (
@@ -296,16 +460,20 @@ Feel free to ask anything about your project!`,
         }}
       >
         <Box sx={{ display: "flex", gap: 1 }}>
-          <TextField
-            fullWidth
-            multiline
-            maxRows={3}
-            placeholder="Ask about your codebase..."
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyPress={handleKeyPress}
-            disabled={isLoading}
-          />
+          <Box sx={{ position: "relative", flexGrow: 1 }}>
+            <TextField
+              ref={inputRef}
+              fullWidth
+              multiline
+              maxRows={3}
+              placeholder="Ask about your codebase... (Use @ to reference files)"
+              value={inputValue}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              disabled={isLoading}
+            />
+            {renderFileAutocomplete()}
+          </Box>
           <Button
             variant="contained"
             onClick={handleSendMessage}
@@ -320,7 +488,8 @@ Feel free to ask anything about your project!`,
           color="text.secondary"
           sx={{ mt: 1, display: "block" }}
         >
-          Press Enter to send, Shift+Enter for new line
+          Press Enter to send, Shift+Enter for new line. Use @ to reference
+          specific files.
         </Typography>
       </Paper>
     </Box>
