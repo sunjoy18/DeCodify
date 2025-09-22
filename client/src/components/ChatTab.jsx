@@ -50,7 +50,6 @@ Feel free to ask anything about your project!`,
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [streaming, setStreaming] = useState(false);
-  const eventSourceRef = useRef(null);
 
   // File autocomplete state
   const [showFileAutocomplete, setShowFileAutocomplete] = useState(false);
@@ -127,7 +126,6 @@ Feel free to ask anything about your project!`,
 
   const insertFileReference = (file) => {
     const beforeAt = inputValue.substring(0, currentAtPosition);
-    const afterCursor = inputValue.substring(inputRef.current.selectionStart);
 
     // Find the next space after @... to know where the mention ends
     const mentionEnd = inputValue.indexOf(" ", currentAtPosition);
@@ -142,8 +140,6 @@ Feel free to ask anything about your project!`,
     // Restore focus and cursor position
     setTimeout(() => {
       inputRef.current?.focus();
-      const newCursorPosition = beforeAt.length + file.displayPath.length + 2; // +2 for @ and space
-      inputRef.current?.setSelectionRange(newCursorPosition, newCursorPosition);
     }, 0);
   };
 
@@ -481,6 +477,70 @@ function MessageContent({ content }) {
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
       components={{
+        // Headings → use Typography
+        h1: ({ children }) => (
+          <Typography variant="h6" gutterBottom>
+            {children}
+          </Typography>
+        ),
+        h2: ({ children }) => (
+          <Typography variant="subtitle1" gutterBottom>
+            {children}
+          </Typography>
+        ),
+        h3: ({ children }) => (
+          <Typography variant="body1" fontWeight={600} gutterBottom>
+            {children}
+          </Typography>
+        ),
+
+        // Paragraphs
+        p: ({ children }) => (
+          <Typography
+            variant="body2"
+            paragraph
+            sx={{ mb: 1.2, lineHeight: 1.5 }}
+          >
+            {children}
+          </Typography>
+        ),
+
+        // Lists
+        ul: ({ children }) => (
+          <Box component="ul" sx={{ pl: 3, mb: 1, lineHeight: 1.5 }}>
+            {children}
+          </Box>
+        ),
+        ol: ({ children }) => (
+          <Box component="ol" sx={{ pl: 3, mb: 1, lineHeight: 1.5 }}>
+            {children}
+          </Box>
+        ),
+        li: ({ children }) => (
+          <li>
+            <Typography variant="body2" component="span">
+              {children}
+            </Typography>
+          </li>
+        ),
+
+        // Blockquotes
+        blockquote: ({ children }) => (
+          <Box
+            component="blockquote"
+            sx={{
+              borderLeft: "3px solid rgba(255,255,255,0.2)",
+              pl: 2,
+              my: 1,
+              color: "text.secondary",
+              fontStyle: "italic",
+            }}
+          >
+            {children}
+          </Box>
+        ),
+
+        // Code blocks
         code({ inline, className, children, ...props }) {
           const match = /language-(\w+)/.exec(className || "");
           if (!inline && match) {
@@ -489,6 +549,11 @@ function MessageContent({ content }) {
                 style={oneDark}
                 language={match[1]}
                 PreTag="div"
+                customStyle={{
+                  margin: 0,
+                  borderRadius: 6,
+                  fontSize: "0.85rem",
+                }}
                 {...props}
               >
                 {String(children).replace(/\n$/, "")}
@@ -496,9 +561,19 @@ function MessageContent({ content }) {
             );
           }
           return (
-            <code className={className} {...props}>
+            <Box
+              component="code"
+              sx={{
+                fontFamily: "Share Tech Mono, monospace",
+                bgcolor: "rgba(255,255,255,0.08)",
+                px: 0.5,
+                borderRadius: 0.5,
+                fontSize: "0.85rem",
+              }}
+              {...props}
+            >
               {children}
-            </code>
+            </Box>
           );
         },
       }}
