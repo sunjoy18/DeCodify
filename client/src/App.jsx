@@ -53,7 +53,6 @@ function App() {
           py: 2,
           px: 3,
           mt: 'auto',
-          backgroundColor: '#f5f5f5',
           borderTop: 1,
           borderColor: 'divider',
           backgroundColor: 'background.paper',

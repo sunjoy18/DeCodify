@@ -7,7 +7,7 @@ An AI-powered frontend codebase explainer that provides AST-based parsing, depen
 - **📁 Project Ingestion**: Upload folders or clone GitHub repositories
 - **🌳 AST Parsing**: Parse JavaScript/TypeScript, HTML, CSS, and Vue files
 - **🔗 Dependency Graphs**: Generate Mermaid diagrams showing file relationships
-- **🤖 AI Chat**: Ask questions about your code using LangChain and OpenAI
+- **🤖 AI Chat**: Ask questions about your code using LangChain and Google Gemini
 - **📊 Code Analysis**: Detailed metrics, function analysis, and issue detection
 - **🎨 Interactive UI**: Modern React interface with Material-UI components
 
@@ -35,7 +35,8 @@ decodify-agent/
 
 - Node.js 18+ 
 - MongoDB (local or cloud)
-- OpenAI API key
+- Google API Key (for Gemini)
+- HuggingFace API key (optional - demo key available)
 
 ### Installation
 
@@ -49,7 +50,8 @@ npm run install:all
 2. **Environment Configuration:**
 ```bash
 # Server environment (.env in root)
-OPENAI_API_KEY=your_openai_api_key
+GOOGLE_API_KEY=your_google_api_key
+HUGGINGFACE_API_KEY=your_huggingface_api_key  # Optional
 MONGODB_URI=mongodb://localhost:27017/decodify
 PORT=5000
 CLIENT_URL=http://localhost:3000
@@ -241,7 +243,8 @@ CMD ["npm", "start"]
 ### Environment Variables (Production)
 ```bash
 NODE_ENV=production
-OPENAI_API_KEY=your_production_key
+GOOGLE_API_KEY=your_production_google_api_key
+HUGGINGFACE_API_KEY=your_production_huggingface_key
 MONGODB_URI=your_production_mongodb_uri
 PORT=5000
 ```
@@ -256,9 +259,9 @@ PORT=5000
    - Ensure proper node/edge count limits
 
 2. **Chat not working:**
-   - Verify OpenAI API key is set
-   - Check vector store initialization
-   - Ensure sufficient embeddings quota
+   - Verify Google API key is set and has Gemini access
+   - Check vector store initialization  
+   - Ensure HuggingFace API key or demo access is working
 
 3. **File parsing errors:**
    - Check file encoding (UTF-8 required)

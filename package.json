@@ -19,14 +19,13 @@
   },
   "keywords": [
     "ast",
-    "code-analysis", 
-    "embeddings",
+    "code-analysis",
     "dependency-graph",
     "mermaid",
     "react",
     "nodejs",
     "mongodb",
-    "langchain"
+    "gemini-ai"
   ],
   "author": "DeCodify Agent Team",
   "license": "MIT",
@@ -35,9 +34,10 @@
     "nodemon": "^3.0.2"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "dotenv": "^16.3.1"
   },
   "engines": {
     "node": ">=18.0.0"
   }
-} 
+}

@@ -1,10 +1,5 @@
 import express from 'express';
-import { ChatOpenAI } from '@langchain/openai';
-import { OpenAIEmbeddings } from '@langchain/openai';
-import { MemoryVectorStore } from 'langchain/vectorstores/memory';
-import { Document } from '@langchain/core/documents';
-import { RetrievalQAChain } from 'langchain/chains';
-import { PromptTemplate } from '@langchain/core/prompts';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import fs from 'fs-extra';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -15,31 +10,74 @@ const __dirname = dirname(__filename);
 
 const router = express.Router();
 
-// Initialize OpenAI components lazily
-let embeddings, llm;
-
-function initializeOpenAI() {
-  if (!embeddings || !llm) {
-    if (!process.env.OPENAI_API_KEY) {
-      throw new Error('OPENAI_API_KEY environment variable is not set');
+// Simple Google Gemini wrapper
+class GeminiChat {
+  constructor() {
+    if (!process.env.GOOGLE_API_KEY) {
+      throw new Error('GOOGLE_API_KEY environment variable is not set');
     }
-    
-    embeddings = new OpenAIEmbeddings({
-      openAIApiKey: process.env.OPENAI_API_KEY,
-      modelName: 'text-embedding-3-small'
-    });
-
-    llm = new ChatOpenAI({
-      openAIApiKey: process.env.OPENAI_API_KEY,
-      modelName: 'gpt-4',
-      temperature: 0.7
+    this.genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+    this.model = this.genAI.getGenerativeModel({ 
+      model: 'gemini-1.5-pro',
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 4096,
+      }
     });
   }
-  return { embeddings, llm };
+
+  async generateResponse(prompt, context = '') {
+    try {
+      const fullPrompt = this.buildPrompt(prompt, context);
+      const result = await this.model.generateContent(fullPrompt);
+      const response = await result.response;
+      return response.text();
+    } catch (error) {
+      console.error('Google Gemini API error:', error);
+      throw new Error(`Google Gemini API call failed: ${error.message}`);
+    }
+  }
+
+  async generateStreamResponse(prompt, context = '', onToken) {
+    try {
+      const fullPrompt = this.buildPrompt(prompt, context);
+      const result = await this.model.generateContentStream(fullPrompt);
+      let fullResponse = '';
+      
+      for await (const chunk of result.stream) {
+        const chunkText = chunk.text();
+        if (chunkText) {
+          fullResponse += chunkText;
+          if (onToken) onToken(chunkText);
+        }
+      }
+      
+      return fullResponse;
+    } catch (error) {
+      console.error('Google Gemini API error:', error);
+      throw new Error(`Google Gemini API call failed: ${error.message}`);
+    }
+  }
+
+  buildPrompt(userMessage, context) {
+    return `You are an expert code analysis assistant with access to a codebase.
+
+${context ? `Codebase Context:\n${context}\n\n` : ''}User Question: ${userMessage}\n\nPlease provide a helpful and accurate answer based on the codebase context. Be specific and reference relevant files, functions, or components when possible.\n\nAnswer:`;
+  }
 }
 
-// Store vector stores for each project
-const projectVectorStores = new Map();
+// Initialize Gemini chat instance
+let geminiChat;
+
+function initializeGemini() {
+  if (!geminiChat) {
+    geminiChat = new GeminiChat();
+  }
+  return geminiChat;
+}
+
+// Store project contexts for each project
+const projectContexts = new Map();
 
 /**
  * Chat with a project's codebase
@@ -53,35 +91,28 @@ router.post('/project/:projectId', async (req, res) => {
       return res.status(400).json({ error: 'Message is required' });
     }
 
-    // Initialize OpenAI components
-    const { embeddings: openaiEmbeddings, llm: openaiLLM } = initializeOpenAI();
+    // Initialize Gemini
+    const chat = initializeGemini();
 
-    // Load or create vector store for the project
-    let vectorStore = projectVectorStores.get(projectId);
-    if (!vectorStore) {
-      vectorStore = await createProjectVectorStore(projectId);
-      if (!vectorStore) {
+    // Load or create context for the project
+    let context = projectContexts.get(projectId);
+    if (!context) {
+      context = await createProjectContext(projectId);
+      if (!context) {
         return res.status(404).json({ error: 'Project not found or no content to analyze' });
       }
-      projectVectorStores.set(projectId, vectorStore);
+      projectContexts.set(projectId, context);
     }
 
-    // Create retrieval chain
-    const chain = RetrievalQAChain.fromLLM(openaiLLM, vectorStore.asRetriever({
-      k: 5 // Retrieve top 5 relevant documents
-    }), {
-      prompt: createCodebasePrompt()
-    });
+    // Build context with conversation history
+    const fullContext = buildFullContext(context, conversationHistory, message);
 
     // Generate response
-    const response = await chain.call({
-      query: message,
-      chat_history: formatConversationHistory(conversationHistory)
-    });
+    const response = await chat.generateResponse(message, fullContext);
 
     res.json({
       success: true,
-      response: response.text,
+      response: response,
       projectId,
       timestamp: new Date().toISOString()
     });
@@ -108,18 +139,18 @@ router.post('/project/:projectId/stream', async (req, res) => {
       return;
     }
 
-    // Initialize OpenAI components with streaming enabled via per-call callbacks
-    initializeOpenAI();
+    // Initialize Gemini
+    const chat = initializeGemini();
 
-    // Load or create vector store for the project
-    let vectorStore = projectVectorStores.get(projectId);
-    if (!vectorStore) {
-      vectorStore = await createProjectVectorStore(projectId);
-      if (!vectorStore) {
+    // Load or create context for the project
+    let context = projectContexts.get(projectId);
+    if (!context) {
+      context = await createProjectContext(projectId);
+      if (!context) {
         res.status(404).json({ error: 'Project not found or no content to analyze' });
         return;
       }
-      projectVectorStores.set(projectId, vectorStore);
+      projectContexts.set(projectId, context);
     }
 
     // Configure headers for Server-Sent Events
@@ -128,40 +159,12 @@ router.post('/project/:projectId/stream', async (req, res) => {
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders?.();
 
-    let accumulatedText = '';
+    // Build context with conversation history
+    const fullContext = buildFullContext(context, conversationHistory, message);
 
-    // Create an LLM instance with streaming callbacks
-    const streamingLLM = new ChatOpenAI({
-      openAIApiKey: process.env.OPENAI_API_KEY,
-      modelName: 'gpt-4',
-      temperature: 0.7,
-      streaming: true,
-      callbacks: [
-        {
-          handleLLMNewToken(token) {
-            accumulatedText += token;
-            // SSE data event per token chunk
-            res.write(`data: ${token}\n\n`);
-          },
-          handleLLMError(err) {
-            res.write(`event: error\n`);
-            res.write(`data: ${JSON.stringify({ message: err.message })}\n\n`);
-          }
-        }
-      ]
-    });
-
-    // Create retrieval chain with the streaming LLM
-    const chain = RetrievalQAChain.fromLLM(
-      streamingLLM,
-      vectorStore.asRetriever({ k: 5 }),
-      { prompt: createCodebasePrompt() }
-    );
-
-    // Execute the chain (tokens will be streamed via callbacks)
-    await chain.call({
-      query: message,
-      chat_history: formatConversationHistory(conversationHistory)
+    // Stream response
+    await chat.generateStreamResponse(message, fullContext, (token) => {
+      res.write(`data: ${token}\n\n`);
     });
 
     // Signal completion
@@ -200,7 +203,7 @@ router.get('/context/:projectId', async (req, res) => {
     }
 
     // Generate context summary
-    const context = generateProjectContext(projectData);
+    const context = generateProjectSummary(projectData);
 
     res.json({
       success: true,
@@ -218,7 +221,7 @@ router.get('/context/:projectId', async (req, res) => {
 });
 
 /**
- * Search project files with semantic search
+ * Search project files with text-based search
  */
 router.post('/search/:projectId', async (req, res) => {
   try {
@@ -229,32 +232,24 @@ router.post('/search/:projectId', async (req, res) => {
       return res.status(400).json({ error: 'Search query is required' });
     }
 
-    // Load or create vector store for the project
-    let vectorStore = projectVectorStores.get(projectId);
-    if (!vectorStore) {
-      vectorStore = await createProjectVectorStore(projectId);
-      if (!vectorStore) {
+    // Load or create context for the project
+    let context = projectContexts.get(projectId);
+    if (!context) {
+      context = await createProjectContext(projectId);
+      if (!context) {
         return res.status(404).json({ error: 'Project not found' });
       }
-      projectVectorStores.set(projectId, vectorStore);
+      projectContexts.set(projectId, context);
     }
 
-    // Perform semantic search
-    const searchResults = await vectorStore.similaritySearchWithScore(query, limit);
-
-    // Format results
-    const formattedResults = searchResults.map(([doc, score]) => ({
-      content: doc.pageContent,
-      metadata: doc.metadata,
-      score: score,
-      relevance: 1 - score // Convert distance to relevance
-    }));
+    // Perform text-based search
+    const searchResults = performTextSearch(context, query, limit);
 
     res.json({
       success: true,
       query,
-      results: formattedResults,
-      count: formattedResults.length
+      results: searchResults,
+      count: searchResults.length
     });
 
   } catch (error) {
@@ -267,14 +262,14 @@ router.post('/search/:projectId', async (req, res) => {
 });
 
 /**
- * Clear chat history and vector store for a project
+ * Clear chat history and context for a project
  */
 router.delete('/project/:projectId', async (req, res) => {
   try {
     const { projectId } = req.params;
     
-    // Remove vector store from memory
-    projectVectorStores.delete(projectId);
+    // Remove context from memory
+    projectContexts.delete(projectId);
     
     res.json({
       success: true,
@@ -293,98 +288,234 @@ router.delete('/project/:projectId', async (req, res) => {
 
 // Helper functions
 
-async function createProjectVectorStore(projectId) {
+async function createProjectContext(projectId) {
   try {
     const projectData = await loadProjectData(projectId);
     if (!projectData || !projectData.parseResults) {
       return null;
     }
 
-    // Create documents from parsed files
-    const documents = [];
+    // Create searchable context from parsed files
+    const context = {
+      projectInfo: {
+        id: projectData.id,
+        name: projectData.name,
+        type: projectData.type,
+        fileCount: projectData.fileCount
+      },
+      files: [],
+      functions: [],
+      classes: [],
+      components: [],
+      summary: ''
+    };
     
     projectData.parseResults.forEach(file => {
       if (file.error) return; // Skip files with errors
 
-      // Create document for file overview
-      const fileDoc = new Document({
-        pageContent: createFileDocumentContent(file),
-        metadata: {
-          type: 'file_overview',
-          filePath: file.filePath,
-          extension: file.extension,
-          size: file.size,
-          lines: file.lines
-        }
-      });
-      documents.push(fileDoc);
+      // Add file overview
+      const fileInfo = {
+        path: file.filePath,
+        extension: file.extension,
+        size: file.size,
+        lines: file.lines,
+        dependencies: file.dependencies || [],
+        exports: file.exports || [],
+        content: createFileDocumentContent(file)
+      };
+      context.files.push(fileInfo);
 
-      // Create documents for functions
+      // Add functions
       if (file.functions && file.functions.length > 0) {
         file.functions.forEach(func => {
-          const funcDoc = new Document({
-            pageContent: createFunctionDocumentContent(func, file),
-            metadata: {
-              type: 'function',
-              filePath: file.filePath,
-              functionName: func.name,
-              functionType: func.type,
-              line: func.line
-            }
+          context.functions.push({
+            name: func.name,
+            type: func.type,
+            file: file.filePath,
+            line: func.line,
+            params: func.params || [],
+            async: func.async || false,
+            content: createFunctionDocumentContent(func, file)
           });
-          documents.push(funcDoc);
         });
       }
 
-      // Create documents for classes
+      // Add classes
       if (file.classes && file.classes.length > 0) {
         file.classes.forEach(cls => {
-          const classDoc = new Document({
-            pageContent: createClassDocumentContent(cls, file),
-            metadata: {
-              type: 'class',
-              filePath: file.filePath,
-              className: cls.name,
-              superClass: cls.superClass,
-              line: cls.line
-            }
+          context.classes.push({
+            name: cls.name,
+            file: file.filePath,
+            line: cls.line,
+            superClass: cls.superClass,
+            content: createClassDocumentContent(cls, file)
           });
-          documents.push(classDoc);
         });
       }
 
-      // Create documents for components
+      // Add components
       if (file.components && file.components.length > 0) {
         file.components.forEach(comp => {
-          const compDoc = new Document({
-            pageContent: createComponentDocumentContent(comp, file),
-            metadata: {
-              type: 'component',
-              filePath: file.filePath,
-              componentName: comp.name,
-              componentType: comp.type,
-              line: comp.line
-            }
+          context.components.push({
+            name: comp.name,
+            type: comp.type,
+            file: file.filePath,
+            line: comp.line,
+            props: comp.props || [],
+            content: createComponentDocumentContent(comp, file)
           });
-          documents.push(compDoc);
         });
       }
     });
 
-    if (documents.length === 0) {
-      return null;
-    }
-
-    // Create vector store
-    const { embeddings: openaiEmbeddings } = initializeOpenAI();
-  const vectorStore = await MemoryVectorStore.fromDocuments(documents, openaiEmbeddings);
+    // Create summary
+    context.summary = createProjectSummary(context);
     
-    return vectorStore;
+    return context;
 
   } catch (error) {
-    console.error('Error creating vector store:', error);
+    console.error('Error creating project context:', error);
     return null;
   }
+}
+
+function performTextSearch(context, query, limit) {
+  const results = [];
+  const queryLower = query.toLowerCase();
+  
+  // Search in files
+  context.files.forEach(file => {
+    if (file.content.toLowerCase().includes(queryLower) || 
+        file.path.toLowerCase().includes(queryLower)) {
+      results.push({
+        type: 'file',
+        content: file.content,
+        metadata: {
+          filePath: file.path,
+          extension: file.extension,
+          size: file.size,
+          lines: file.lines
+        },
+        relevance: calculateRelevance(file.content, query)
+      });
+    }
+  });
+  
+  // Search in functions
+  context.functions.forEach(func => {
+    if (func.content.toLowerCase().includes(queryLower) || 
+        func.name.toLowerCase().includes(queryLower)) {
+      results.push({
+        type: 'function',
+        content: func.content,
+        metadata: {
+          functionName: func.name,
+          filePath: func.file,
+          line: func.line,
+          type: func.type
+        },
+        relevance: calculateRelevance(func.content, query)
+      });
+    }
+  });
+  
+  // Search in classes
+  context.classes.forEach(cls => {
+    if (cls.content.toLowerCase().includes(queryLower) || 
+        cls.name.toLowerCase().includes(queryLower)) {
+      results.push({
+        type: 'class',
+        content: cls.content,
+        metadata: {
+          className: cls.name,
+          filePath: cls.file,
+          line: cls.line,
+          superClass: cls.superClass
+        },
+        relevance: calculateRelevance(cls.content, query)
+      });
+    }
+  });
+  
+  // Search in components
+  context.components.forEach(comp => {
+    if (comp.content.toLowerCase().includes(queryLower) || 
+        comp.name.toLowerCase().includes(queryLower)) {
+      results.push({
+        type: 'component',
+        content: comp.content,
+        metadata: {
+          componentName: comp.name,
+          filePath: comp.file,
+          line: comp.line,
+          type: comp.type
+        },
+        relevance: calculateRelevance(comp.content, query)
+      });
+    }
+  });
+  
+  // Sort by relevance and limit
+  return results
+    .sort((a, b) => b.relevance - a.relevance)
+    .slice(0, limit);
+}
+
+function calculateRelevance(content, query) {
+  const contentLower = content.toLowerCase();
+  const queryLower = query.toLowerCase();
+  const matches = (contentLower.match(new RegExp(queryLower, 'g')) || []).length;
+  return matches / content.length;
+}
+
+function buildFullContext(context, conversationHistory, currentMessage) {
+  let fullContext = `Project: ${context.projectInfo.name}\n`;
+  fullContext += `Type: ${context.projectInfo.type}\n`;
+  fullContext += `Files: ${context.files.length}\n`;
+  fullContext += `Functions: ${context.functions.length}\n`;
+  fullContext += `Classes: ${context.classes.length}\n`;
+  fullContext += `Components: ${context.components.length}\n\n`;
+  
+  // Add project summary
+  fullContext += `Project Summary:\n${context.summary}\n\n`;
+  
+  // Find relevant context based on current message
+  const relevantItems = findRelevantContext(context, currentMessage);
+  if (relevantItems.length > 0) {
+    fullContext += 'Relevant Code Context:\n';
+    relevantItems.forEach(item => {
+      fullContext += `${item.content}\n\n`;
+    });
+  }
+  
+  // Add conversation history
+  if (conversationHistory && conversationHistory.length > 0) {
+    fullContext += 'Previous Conversation:\n';
+    fullContext += formatConversationHistory(conversationHistory);
+  }
+  
+  return fullContext;
+}
+
+function findRelevantContext(context, message) {
+  const messageLower = message.toLowerCase();
+  const relevantItems = [];
+  
+  // Find relevant files, functions, classes, components
+  const allItems = [
+    ...context.files.map(f => ({ ...f, type: 'file' })),
+    ...context.functions.map(f => ({ ...f, type: 'function' })),
+    ...context.classes.map(c => ({ ...c, type: 'class' })),
+    ...context.components.map(c => ({ ...c, type: 'component' }))
+  ];
+  
+  allItems.forEach(item => {
+    if (item.content && item.content.toLowerCase().includes(messageLower)) {
+      relevantItems.push(item);
+    }
+  });
+  
+  return relevantItems.slice(0, 5); // Limit to top 5 most relevant
 }
 
 function createFileDocumentContent(file) {
@@ -467,23 +598,34 @@ function createComponentDocumentContent(comp, file) {
   return content;
 }
 
-function createCodebasePrompt() {
-  return new PromptTemplate({
-    template: `You are an expert code analysis assistant. You have access to information about a codebase including files, functions, classes, and components.
-
-Context from the codebase:
-{context}
-
-Previous conversation:
-{chat_history}
-
-Question: {query}
-
-Please provide a helpful and accurate answer based on the codebase context. Be specific and reference relevant files, functions, or components when possible.
-
-Answer:`,
-    inputVariables: ['context', 'chat_history', 'query']
+function createProjectSummary(context) {
+  let summary = `This project contains ${context.files.length} files:\n`;
+  
+  // Group files by extension
+  const filesByExt = {};
+  context.files.forEach(file => {
+    const ext = file.extension || 'unknown';
+    filesByExt[ext] = (filesByExt[ext] || 0) + 1;
   });
+  
+  Object.entries(filesByExt).forEach(([ext, count]) => {
+    summary += `- ${count} ${ext} files\n`;
+  });
+  
+  summary += `\nCode Structure:\n`;
+  summary += `- ${context.functions.length} functions\n`;
+  summary += `- ${context.classes.length} classes\n`;
+  summary += `- ${context.components.length} components\n\n`;
+  
+  // List main files
+  if (context.files.length > 0) {
+    summary += 'Main Files:\n';
+    context.files.slice(0, 10).forEach(file => {
+      summary += `- ${file.path}\n`;
+    });
+  }
+  
+  return summary;
 }
 
 function formatConversationHistory(history) {
@@ -497,7 +639,7 @@ function formatConversationHistory(history) {
     .join('\n\n');
 }
 
-function generateProjectContext(projectData) {
+function generateProjectSummary(projectData) {
   const context = {
     projectInfo: {
       id: projectData.id,
