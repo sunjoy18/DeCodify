@@ -22,6 +22,7 @@ const MermaidDiagram = ({
   error = null,
   height = "400px" 
 }) => {
+  console.log("definition", definition);
   const diagramRef = useRef(null);
   const [diagramError, setDiagramError] = React.useState(null);
 
