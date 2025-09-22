@@ -111,7 +111,7 @@ const Home = () => {
   ];
 
   return (
-    <Container maxWidth="xl" sx={{  }}>
+    <Container maxWidth="xl" sx={{}}>
       {/* Hero Section */}
       <Box textAlign="center" mb={6}>
         <Typography variant="h2" component="h1" gutterBottom fontWeight="bold">
@@ -273,7 +273,7 @@ const Home = () => {
       </Grid>
 
       {/* How It Works */}
-      <Grid container spacing={4} alignItems="center">
+      <Grid container spacing={4} alignItems="flex-end">
         <Grid item xs={12} md={6}>
           <Typography variant="h4" gutterBottom fontWeight="bold">
             How It Works
@@ -313,13 +313,12 @@ const Home = () => {
           <Paper
             elevation={3}
             sx={{
-              p: 4,
-              bgcolor: "grey.200",
+              p: 2,
               textAlign: "center",
             }}
           >
             <SpeedIcon sx={{ fontSize: 60, color: "primary.main", mb: 2 }} />
-            <Typography variant="h5" gutterBottom fontWeight="bold" color="grey.800">
+            <Typography variant="h5" gutterBottom fontWeight="bold">
               Fast & Accurate
             </Typography>
             <Typography variant="body1" color="text.secondary" mb={3}>
