@@ -342,7 +342,13 @@ const CodebaseTab = ({ projectId, project }) => {
 
       {/* File Content */}
       <Box
-        sx={{ flexGrow: 1, display: "flex", flexDirection: "column", gap: 1 }}
+        sx={{
+          flexGrow: 1,
+          display: "flex",
+          flexDirection: "column",
+          gap: 1,
+          width: "800px",
+        }}
       >
         {selectedFile ? (
           <>
@@ -462,8 +468,18 @@ const CodebaseTab = ({ projectId, project }) => {
                   {fileContent}
                 </SyntaxHighlighter>
               ) : (
-                <Box sx={{ p: 2 }}>
-                  <Typography color="text.secondary">
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    height: "100%",
+                    flexDirection: "column",
+                    gap: 2,
+                  }}
+                >
+                  <FolderIcon sx={{ fontSize: 64, opacity: 0.3 }} />
+                  <Typography variant="h6" color="text.secondary">
                     Select a file to view its content
                   </Typography>
                 </Box>
