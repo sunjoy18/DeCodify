@@ -118,7 +118,7 @@ const Home = () => {
           DeCodify Agent
         </Typography>
         <Typography variant="h5" color="text.secondary" gutterBottom>
-          AI-Powered Frontend Codebase Explainer
+          AI-Powered Codebase Explainer
         </Typography>
         <Typography variant="body1" sx={{ maxWidth: 600, mx: "auto", mb: 2 }}>
           Upload your project and get instant insights with AST parsing,
@@ -279,7 +279,7 @@ const Home = () => {
             How It Works
           </Typography>
           <Typography variant="body1" color="text.secondary" mb={3}>
-            Get comprehensive insights into your frontend codebase in just a few
+            Get comprehensive insights into your codebase in just a few
             simple steps.
           </Typography>
           <Paper elevation={1} sx={{ p: 2 }}>

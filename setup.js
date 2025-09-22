@@ -221,7 +221,7 @@ const defaults = {
     VITE_API_BASE_URL: 'http://localhost:5000/api',
     VITE_WS_URL: 'ws://localhost:5000',
     VITE_APP_TITLE: 'DeCodify Agent',
-    VITE_APP_DESCRIPTION: 'AI-powered frontend codebase explainer',
+    VITE_APP_DESCRIPTION: 'AI-powered codebase explainer',
     VITE_APP_VERSION: '1.0.0',
     VITE_ENABLE_GITHUB_INTEGRATION: 'true',
     VITE_ENABLE_REAL_TIME_COLLABORATION: 'false',

@@ -179,7 +179,7 @@ const Upload = () => {
         color="text.secondary"
         mb={2}
       >
-        Choose how you'd like to upload your frontend project for analysis
+        Choose how you'd like to upload your project for analysis
       </Typography>
 
       <Grid container spacing={4}>

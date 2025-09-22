@@ -106,7 +106,7 @@ const DiagramTab = ({ projectId, project }) => {
           components: {
             title: 'No Components Found',
             message: 'This project does not contain React/Vue components',
-            suggestion: 'Upload a frontend project with .jsx, .vue, or component files'
+            suggestion: 'Upload a project with .jsx, .vue, or component files'
           },
           functions: {
             title: 'Function Analysis Failed',

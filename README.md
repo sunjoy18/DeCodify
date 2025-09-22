@@ -1,6 +1,6 @@
 # DeCodify Agent
 
-An AI-powered frontend codebase explainer that provides AST-based parsing, dependency analysis, and intelligent Q&A capabilities for understanding complex codebases.
+An AI-powered codebase explainer that provides AST-based parsing, dependency analysis, and intelligent Q&A capabilities for understanding complex codebases.
 
 ## Features
 

@@ -1,6 +1,6 @@
 import React from "react";
 import { Routes, Route } from "react-router-dom";
-import { Box, AppBar, Toolbar, Typography, Container } from "@mui/material";
+import { Box, Typography, Container } from "@mui/material";
 import Home from "./pages/Home";
 import ProjectView from "./pages/ProjectView";
 import Upload from "./pages/Upload";
@@ -60,7 +60,7 @@ function App() {
         }}
       >
         <Typography variant="body2" color="text.secondary" align="center">
-          DeCodify Agent - Frontend Codebase Explainer with AST Parsing & AI
+          DeCodify Agent - Codebase Explainer with AST Parsing & AI
         </Typography>
       </Box>
     </Box>

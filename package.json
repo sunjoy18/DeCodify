@@ -1,7 +1,7 @@
 {
   "name": "decodify-agent",
   "version": "1.0.0",
-  "description": "AI-powered frontend codebase explainer with AST parsing, embeddings, and dependency graph generation",
+  "description": "AI-powered codebase explainer with AST parsing, embeddings, and dependency graph generation",
   "main": "server/index.js",
   "type": "module",
   "scripts": {
