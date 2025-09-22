@@ -358,82 +358,61 @@ Feel free to ask anything about your project!`,
 
   return (
     <Box sx={{ height: "100vh", display: "flex", flexDirection: "column" }}>
-      {/* Project Info */}
-      <Paper
-        sx={{
-          p: 2,
-          mb: 2,
-          bgcolor: "background.paper",
-          border: "1px solid rgba(255,255,255,0.08)",
-          backdropFilter: "blur(8px) saturate(120%)",
-        }}
-      >
-        <Typography variant="h6" gutterBottom>
-          Chat with your codebase
-        </Typography>
-        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-          <Chip
-            size="small"
-            label={`Project: ${project?.name || "Unknown"}`}
-            color="primary"
-          />
-          <Chip
-            size="small"
-            label={`${project?.fileCount || 0} files analyzed`}
-          />
-        </Box>
-      </Paper>
-
       {/* Messages */}
       <Paper
         sx={{
           flex: 1,
-          p: 2,
-          mb: 2,
+          p: 1,
+          mb: 1, // reduced spacing
           overflow: "auto",
           bgcolor: "background.paper",
           border: "1px solid rgba(255,255,255,0.08)",
-          boxShadow: "0 8px 32px rgba(0,0,0,0.45)",
-          backdropFilter: "blur(8px) saturate(120%)",
-          minHeight: "50vh",
+          boxShadow: "0 4px 16px rgba(0,0,0,0.35)", // lighter shadow
+          backdropFilter: "blur(6px) saturate(110%)",
+          minHeight: "40vh", // slimmer minimum
         }}
       >
-        <List>
+        <List dense>
           {messages.map((message) => (
             <ListItem
               key={message.id}
               sx={{
                 flexDirection: "column",
                 alignItems: message.type === "user" ? "flex-end" : "flex-start",
-                mb: 2,
+                mb: 1, // tighter vertical gap
               }}
             >
               <Box
                 sx={{
-                  maxWidth: "80%",
-                  p: 2,
-                  borderRadius: 2,
+                  maxWidth: "75%",
+                  p: 1.2, // smaller padding
+                  borderRadius: 1.5, // slightly tighter corners
                   bgcolor: message.isError
                     ? "rgba(244,67,54,0.15)"
-                    : "rgba(255,255,255,0.06)",
+                    : "rgba(255,255,255,0.05)",
                   color: message.type === "user" ? "white" : "text.primary",
                   border:
                     message.type === "user"
                       ? "none"
                       : "1px solid rgba(255,255,255,0.08)",
+                  fontSize: "0.85rem", // compact text
+                  lineHeight: 1.4,
                 }}
               >
                 {message.type !== "user" && (
-                  <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+                  <Box sx={{ display: "flex", alignItems: "center", mb: 0.5 }}>
                     {message.type === "user" ? <PersonIcon /> : <AIIcon />}
-                    <Typography variant="caption" sx={{ ml: 1, opacity: 0.8 }}>
+                    <Typography
+                      variant="caption"
+                      sx={{ ml: 0.5, opacity: 0.7 }}
+                    >
                       {message.type === "user" ? "You" : "AI Assistant"}
                     </Typography>
                   </Box>
                 )}
                 <Box
                   sx={{
-                    "& pre": { m: 0, mb: 1 },
+                    "& pre": { m: 0, mb: 0.5 },
                     "& code": { fontFamily: "Share Tech Mono, monospace" },
                   }}
                 >
@@ -443,10 +422,10 @@ Feel free to ask anything about your project!`,
             </ListItem>
           ))}
           {isLoading && (
-            <ListItem sx={{ justifyContent: "flex-start" }}>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                <CircularProgress size={20} />
-                <Typography variant="body2" color="text.secondary">
+            <ListItem sx={{ justifyContent: "flex-start", py: 0.5 }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                <CircularProgress size={16} />
+                <Typography variant="caption" color="text.secondary">
                   AI is thinking...
                 </Typography>
               </Box>
@@ -458,24 +437,25 @@ Feel free to ask anything about your project!`,
       {/* Input */}
       <Paper
         sx={{
-          p: 2,
+          p: 1,
           bgcolor: "background.paper",
           border: "1px solid rgba(255,255,255,0.08)",
-          backdropFilter: "blur(8px) saturate(120%)",
+          backdropFilter: "blur(6px) saturate(110%)",
         }}
       >
-        <Box sx={{ display: "flex", gap: 1 }}>
+        <Box sx={{ display: "flex", gap: 0.5 }}>
           <Box sx={{ position: "relative", flexGrow: 1 }}>
             <TextField
               ref={inputRef}
               fullWidth
               multiline
               maxRows={3}
-              placeholder="Ask about your codebase... (Use @ to reference files)"
+              placeholder="Ask about your codebase..."
               value={inputValue}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
               disabled={isLoading}
+              size="small" // compact field
             />
             {renderFileAutocomplete()}
           </Box>
@@ -483,19 +463,11 @@ Feel free to ask anything about your project!`,
             variant="contained"
             onClick={handleSendMessage}
             disabled={!inputValue.trim() || isLoading}
-            sx={{ minWidth: "auto", px: 2 }}
+            sx={{ minWidth: "auto", px: 1.5, py: 0.5 }}
           >
-            <SendIcon />
+            <SendIcon fontSize="small" />
           </Button>
         </Box>
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{ mt: 1, display: "block" }}
-        >
-          Press Enter to send, Shift+Enter for new line. Use @ to reference
-          specific files.
-        </Typography>
       </Paper>
     </Box>
   );
