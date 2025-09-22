@@ -68,10 +68,10 @@ const CodebaseTab = ({ projectId, project }) => {
   // Helper function to clean file paths for display
   const cleanFilePath = (filePath) => {
     // Normalize path separators first
-    const normalizedPath = filePath.replace(/\\/g, '/');
+    const normalizedPath = filePath.replace(/\\/g, "/");
     // Remove uploads/projectId/ prefix from file paths
     const uploadsPattern = /^uploads\/[^\/]+\//;
-    return normalizedPath.replace(uploadsPattern, '');
+    return normalizedPath.replace(uploadsPattern, "");
   };
 
   const buildFileTree = (files) => {
@@ -308,19 +308,19 @@ const CodebaseTab = ({ projectId, project }) => {
   }
 
   return (
-    <Box sx={{ height: "100vh", display: "flex" }}>
+    <Box sx={{ height: "90vh", display: "flex", gap: 1 }}>
       {/* File Tree */}
       <Paper
         sx={{
           width: 300,
           minWidth: 300,
-          p: 2,
+          p: 1,
           borderRight: "1px solid rgba(255,255,255,0.08)",
           bgcolor: "background.paper",
           overflow: "auto",
         }}
       >
-        <Typography variant="h6" sx={{ mb: 2 }}>
+        <Typography variant="h6" sx={{ p: 1 }}>
           Project Files
         </Typography>
 
@@ -341,13 +341,15 @@ const CodebaseTab = ({ projectId, project }) => {
       </Paper>
 
       {/* File Content */}
-      <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column" }}>
+      <Box
+        sx={{ flexGrow: 1, display: "flex", flexDirection: "column", gap: 1 }}
+      >
         {selectedFile ? (
           <>
             {/* Header */}
             <Paper
               sx={{
-                p: 2,
+                p: 1,
                 borderBottom: "1px solid rgba(255,255,255,0.08)",
                 bgcolor: "background.paper",
               }}
@@ -357,66 +359,77 @@ const CodebaseTab = ({ projectId, project }) => {
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
-                  mb: 1,
+                  mb: 0.5, // tighter spacing
+                  minHeight: 36, // cap height
                 }}
               >
-                <Typography variant="h6">{selectedFile.name}</Typography>
+                <Box
+                  sx={{
+                    display: "flex",
+                    flexDirection: "row",
+                    gap: 0.5,
+                    alignItems: "center",
+                  }}
+                >
+                  <Typography
+                    variant="subtitle2"
+                    noWrap
+                    sx={{ fontWeight: 600, lineHeight: 1.2, mb: 0 }}
+                  >
+                    {selectedFile.name}
+                  </Typography>
+
+                  {selectedFile.file && (
+                    <Box sx={{ display: "flex", gap: 1 }}>
+                      <Chip
+                        label={`${selectedFile.file.size} bytes`}
+                        size="small"
+                      />
+                      <Chip
+                        label={`${selectedFile.file.lines} lines`}
+                        size="small"
+                      />
+                      <Chip label={selectedFile.file.extension} size="small" />
+                    </Box>
+                  )}
+                </Box>
 
                 {selectedFile.isFile && (
-                  <Box sx={{ display: "flex", gap: 1 }}>
+                  <Box sx={{ display: "flex", gap: 0.5 }}>
                     <Tooltip title="Copy content">
-                      <IconButton size="small" onClick={copyToClipboard}>
-                        <CopyIcon />
+                      <IconButton
+                        size="small"
+                        sx={{ p: 0.5 }}
+                        onClick={copyToClipboard}
+                      >
+                        <CopyIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
                     <Tooltip title="Download file">
-                      <IconButton size="small" onClick={downloadFile}>
-                        <DownloadIcon />
+                      <IconButton
+                        size="small"
+                        sx={{ p: 0.5 }}
+                        onClick={downloadFile}
+                      >
+                        <DownloadIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
                   </Box>
                 )}
               </Box>
 
-              <Breadcrumbs separator="/" sx={{ fontSize: "0.875rem" }}>
-                {getBreadcrumbs().map((crumb, index) => (
-                  <Link
-                    key={crumb.path}
-                    color="inherit"
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      // Could implement navigation to folder
-                    }}
-                    sx={{ textDecoration: "none" }}
-                  >
-                    {crumb.name}
-                  </Link>
-                ))}
-              </Breadcrumbs>
-              
               {/* Display clean file path */}
-              <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ mt: 0.5, display: "block" }}
+              >
                 📁 {selectedFile.path}
               </Typography>
-
-              {selectedFile.file && (
-                <Box sx={{ display: "flex", gap: 1, mt: 1 }}>
-                  <Chip
-                    label={`${selectedFile.file.size} bytes`}
-                    size="small"
-                  />
-                  <Chip
-                    label={`${selectedFile.file.lines} lines`}
-                    size="small"
-                  />
-                  <Chip label={selectedFile.file.extension} size="small" />
-                </Box>
-              )}
             </Paper>
 
             {/* Content */}
-            <Box sx={{ flexGrow: 1, overflow: "auto", bgcolor: "#1e1e1e" }}>
+            <Box sx={{ flexGrow: 1, overflow: "auto" }}>
               {contentLoading ? (
                 <Box
                   sx={{

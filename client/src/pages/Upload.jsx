@@ -164,9 +164,9 @@ const Upload = () => {
   });
 
   return (
-    <Container maxWidth="md" sx={{ py: 4 }}>
+    <Container maxWidth="md">
       <Typography
-        variant="h3"
+        variant="h4"
         textAlign="center"
         gutterBottom
         fontWeight="bold"
@@ -177,7 +177,7 @@ const Upload = () => {
         variant="body1"
         textAlign="center"
         color="text.secondary"
-        mb={4}
+        mb={2}
       >
         Choose how you'd like to upload your frontend project for analysis
       </Typography>
@@ -290,7 +290,6 @@ const Upload = () => {
               {/* a dropdown with the branches of the repo also custom input allowed */}
               <Select
                 fullWidth
-                label="Branch"
                 value={branch}
                 onChange={(e) => setBranch(e.target.value)}
                 disabled={isUploading}
@@ -326,11 +325,17 @@ const Upload = () => {
                 onClick={handleGithubUpload}
                 disabled={isUploading || !githubUrl.trim()}
                 startIcon={
-                  isUploading ? <CircularProgress size={20} /> : <GitHubIcon />
+                  isUploading ? (
+                    <CircularProgress size={20} color="black" />
+                  ) : (
+                    <GitHubIcon sx={{ color: "black" }} />
+                  )
                 }
                 sx={{ py: 1.5 }}
               >
-                {isUploading ? "Cloning Repository..." : "Clone Repository"}
+                <Typography sx={{ color: "black" }}>
+                  {isUploading ? "Cloning Repository..." : "Clone Repository"}
+                </Typography>
               </Button>
 
               {isUploading && (
@@ -400,7 +405,7 @@ const Upload = () => {
       )}
 
       {/* Information Section */}
-      <Paper sx={{ mt: 4, p: 3 }}>
+      <Paper sx={{ mt: 2, p: 3 }}>
         <Typography variant="h6" gutterBottom>
           What happens after upload?
         </Typography>

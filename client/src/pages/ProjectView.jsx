@@ -67,7 +67,7 @@ const ProjectView = () => {
 
   if (loading) {
     return (
-      <Container maxWidth="lg" sx={{ py: 4, textAlign: "center" }}>
+      <Container maxWidth="xl" sx={{ textAlign: "center" }}>
         <CircularProgress size={60} />
         <Typography variant="h6" sx={{ mt: 2 }}>
           Loading project...
@@ -78,7 +78,7 @@ const ProjectView = () => {
 
   if (error) {
     return (
-      <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Container maxWidth="xl">
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
         </Alert>
@@ -95,7 +95,7 @@ const ProjectView = () => {
 
   if (!project) {
     return (
-      <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Container maxWidth="xl" sx={{ px: 0 }}>
         <Alert severity="warning" sx={{ mb: 2 }}>
           Project not found
         </Alert>
@@ -111,89 +111,73 @@ const ProjectView = () => {
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <Container maxWidth="xl" sx={{ py: 1, px: 0 }}>
       {/* Header */}
-      <Box sx={{ mb: 4 }}>
-        <Button
-          startIcon={<BackIcon />}
-          onClick={() => navigate("/upload")}
-          sx={{ mb: 2 }}
-        >
+      <Box sx={{ mb: 2 }}>
+        <Button startIcon={<BackIcon />} onClick={() => navigate("/upload")}>
           Back to Upload
         </Button>
 
-        <Typography variant="h4" gutterBottom fontWeight="bold">
+        <Typography variant="h6" gutterBottom fontWeight="bold">
           {project.name || "Project Analysis"}
         </Typography>
-
-        {/* Project Stats */}
-        <Grid container spacing={2} sx={{ mb: 3 }}>
-          <Grid item>
-            <Chip
-              icon={<FolderIcon />}
-              label={`${project.fileCount || 0} Files`}
-              color="primary"
-              variant="outlined"
-            />
-          </Grid>
-          {project.languages && (
-            <Grid item>
-              <Chip
-                label={`Languages: ${project.languages.join(", ")}`}
-                variant="outlined"
-              />
-            </Grid>
-          )}
-          {project.uploadedAt && (
-            <Grid item>
-              <Chip
-                label={`Uploaded: ${new Date(
-                  project.uploadedAt
-                ).toLocaleDateString()}`}
-                variant="outlined"
-              />
-            </Grid>
-          )}
-        </Grid>
-
-        {project.description && (
-          <Typography variant="body1" color="text.secondary">
-            {project.description}
-          </Typography>
-        )}
       </Box>
 
       {/* Tabs */}
-      <Paper sx={{ mb: 3 }}>
+      <Paper sx={{ mb: 1 }}>
         <Tabs
           value={currentTab}
           onChange={handleTabChange}
           variant="fullWidth"
-          sx={{ borderBottom: 1, borderColor: "divider" }}
+          sx={{
+            borderBottom: 1,
+            borderColor: "divider",
+            minHeight: 40, // reduce Tabs container height
+          }}
         >
           <Tab
             icon={<CodebaseIcon />}
             label="Codebase"
             iconPosition="start"
-            sx={{ minHeight: 64 }}
+            sx={{
+              minHeight: 40, // reduce height
+              p: 0.5, // reduce padding
+              fontSize: "0.8rem", // smaller text
+              textTransform: "none",
+            }}
           />
           <Tab
             icon={<ChatIcon />}
             label="AI Chat"
             iconPosition="start"
-            sx={{ minHeight: 64 }}
+            sx={{
+              minHeight: 40,
+              p: 0.5,
+              fontSize: "0.8rem",
+              textTransform: "none",
+            }}
           />
           <Tab
             icon={<DiagramIcon />}
             label="Diagrams"
             iconPosition="start"
-            sx={{ minHeight: 64 }}
+            sx={{
+              minHeight: 40,
+              p: 0.5,
+              fontSize: "0.8rem",
+              textTransform: "none",
+            }}
           />
           <Tab
             icon={<AnalyticsIcon />}
             label="Analysis"
             iconPosition="start"
-            sx={{ minHeight: 64 }}
+            sx={{
+              minHeight: 40,
+              p: 0.5,
+              fontSize: "0.8rem",
+              textTransform: "none",
+            }}
           />
         </Tabs>
       </Paper>

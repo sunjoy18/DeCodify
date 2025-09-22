@@ -72,7 +72,7 @@ const theme = createTheme({
         },
         containedPrimary: {
           background: 'linear-gradient(135deg, #00e5ff 0%, #00bcd4 100%)',
-          boxShadow: '0 8px 20px rgba(0, 229, 255, 0.25)'
+          boxShadow: '0 8px 20px rgba(0, 229, 255, 0.25)',
         },
         containedSecondary: {
           background: 'linear-gradient(135deg, #ff6ec7 0%, #ff3d81 100%)',

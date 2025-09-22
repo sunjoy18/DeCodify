@@ -11,27 +11,15 @@ import ErrorBoundary from "./components/ErrorBoundary";
 function App() {
   return (
     <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
-      {/* <AppBar position="static" elevation={1}>
-        <Toolbar>
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            DeCodify Agent
-          </Typography>
-          <Typography variant="subtitle2" sx={{ opacity: 0.8 }}>
-            AI-Powered Code Analysis
-          </Typography>
-        </Toolbar>
-      </AppBar> */}
-
       <Navbar />
-
       <Container
         maxWidth={false}
         sx={{
           flexGrow: 1,
           display: "flex",
           flexDirection: "column",
-          py: 2,
           px: { xs: 1, sm: 3 },
+          py: 1,
         }}
       >
         <ErrorBoundary>
@@ -63,12 +51,11 @@ function App() {
       <Box
         component="footer"
         sx={{
-          py: 2,
           px: 3,
+          py: 2,
           mt: "auto",
           borderTop: 1,
           borderColor: "divider",
-          backgroundColor: "#f5f5f5",
           backdropFilter: "blur(8px) saturate(120%)",
         }}
       >
