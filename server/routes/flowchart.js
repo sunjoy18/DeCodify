@@ -45,9 +45,10 @@ router.get('/dependency/:projectId', async (req, res) => {
       groupByDirectory: groupByDirectory === 'true'
     };
 
-    // Check if dependency graph exists and has data
-    if (!projectData.dependencyGraph || !projectData.dependencyGraph.nodes || projectData.dependencyGraph.nodes.length === 0) {
-      // Generate a simple diagram from file list if dependency graph is empty
+    // Use fallback when: no graph, no nodes, or no edges (improved fallback has real deps from parseResults)
+    const hasValidGraph = projectData.dependencyGraph?.nodes?.length > 0;
+    const hasEdges = (projectData.dependencyGraph?.edges?.length || 0) > 0;
+    if (!hasValidGraph || !hasEdges) {
       const fallbackGraph = generateFallbackGraph(projectData);
       const mermaidDSL = mermaidService.generateFlowchart(fallbackGraph, options);
       
@@ -64,8 +65,17 @@ router.get('/dependency/:projectId', async (req, res) => {
       });
     }
 
+    // Add shortLabel for cleaner display (strip uploads/uuid prefix)
+    const graphWithShortLabels = {
+      ...projectData.dependencyGraph,
+      nodes: (projectData.dependencyGraph.nodes || []).map(n => ({
+        ...n,
+        shortLabel: n.shortLabel || getShortLabel(n.id)
+      }))
+    };
+
     const mermaidDSL = mermaidService.generateFlowchart(
-      projectData.dependencyGraph, 
+      graphWithShortLabels, 
       options
     );
 
@@ -398,49 +408,93 @@ async function loadProjectData(projectId) {
   return null;
 }
 
+/**
+ * Normalize path for cross-platform comparison
+ */
+function normalizePath(filePath) {
+  if (!filePath) return '';
+  return String(filePath).replace(/\\/g, '/');
+}
+
+/**
+ * Resolve dependency to a file in the parsed results
+ */
+function resolveDepToFile(fromFilePath, depSource, files) {
+  const normFrom = normalizePath(fromFilePath);
+  const fromDir = path.dirname(normFrom).replace(/\\/g, '/');
+  const base = depSource.replace(/^\.\//, '');
+
+  const extensions = ['', '.js', '.jsx', '.ts', '.tsx', '.css', '.html', '.vue'];
+  for (const ext of extensions) {
+    const candidate = (fromDir + '/' + base + ext).replace(/\/+/g, '/');
+    const match = files.find(f => normalizePath(f.filePath || f.path) === candidate);
+    if (match) return match.filePath || match.path;
+  }
+  return null;
+}
+
+/**
+ * Get a short, human-readable label (strip uploads/uuid prefix)
+ */
+function getShortLabel(filePath) {
+  const norm = normalizePath(filePath || '');
+  // Remove uploads/uuid/ prefix for cleaner display
+  const match = norm.match(/uploads\/[a-f0-9-]+\/(.+)$/i) || norm.match(/(?:src|lib|components)\/(.+)$/);
+  return match ? match[1] : path.basename(filePath);
+}
+
 function generateFallbackGraph(projectData) {
   const graph = {
     nodes: [],
     edges: []
   };
 
-  // Generate nodes from parseResults or files list
   const files = projectData.parseResults || projectData.files || [];
-  
+  const pathToNode = new Map();
+  const seenPaths = new Set();
+
+  // Build nodes with short labels, deduplicate
   files.forEach(file => {
-    // Handle different data structures
-    const filePath = file.filePath || file.path || file.name;
-    const fileName = path.basename(filePath);
-    
-    graph.nodes.push({
+    const filePath = normalizePath(file.filePath || file.path || file.name || '');
+    if (!filePath || seenPaths.has(filePath)) return;
+    seenPaths.add(filePath);
+
+    const shortLabel = getShortLabel(filePath);
+    const node = {
       id: filePath,
-      label: fileName,
-      type: path.extname(filePath),
+      label: shortLabel,
+      shortLabel,
+      type: path.extname(filePath) || file.extension || '',
       size: file.size || 0,
       functions: file.functions?.length || 0,
       classes: file.classes?.length || 0,
       components: file.components?.length || 0
-    });
+    };
+    graph.nodes.push(node);
+    pathToNode.set(filePath, node);
   });
 
-  // Create some basic edges based on common patterns
-  const jsFiles = graph.nodes.filter(n => ['.js', '.jsx', '.ts', '.tsx'].includes(n.type));
-  const mainFiles = graph.nodes.filter(n => 
-    n.label.toLowerCase().includes('index') || 
-    n.label.toLowerCase().includes('main') || 
-    n.label.toLowerCase().includes('app')
-  );
+  // Build edges from ACTUAL dependencies in parseResults (deduplicated)
+  const edgeKeys = new Set();
+  files.forEach(file => {
+    const fromPath = normalizePath(file.filePath || file.path || '');
+    if (!pathToNode.has(fromPath)) return;
 
-  // Connect main files to other JS files (simple heuristic)
-  mainFiles.forEach(mainFile => {
-    jsFiles.slice(0, Math.min(5, jsFiles.length)).forEach(file => {
-      if (file.id !== mainFile.id) {
-        graph.edges.push({
-          from: mainFile.id,
-          to: file.id,
-          type: 'import',
-          label: 'imports'
-        });
+    (file.dependencies || []).forEach(dep => {
+      if (dep.external) return;
+      const toPath = resolveDepToFile(fromPath, dep.source, files);
+      const normTo = toPath ? normalizePath(toPath) : '';
+      if (normTo && pathToNode.has(normTo) && normTo !== fromPath) {
+        const key = `${fromPath}->${normTo}`;
+        if (!edgeKeys.has(key)) {
+          edgeKeys.add(key);
+          graph.edges.push({
+            from: fromPath,
+            to: normTo,
+            type: dep.type || 'import',
+            label: dep.source
+          });
+        }
       }
     });
   });

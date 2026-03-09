@@ -311,45 +311,94 @@ class ASTParserService {
   }
 
   /**
-   * Extract function declarations from AST
+   * Extract function declarations from AST with call relationships
    */
   extractFunctions(ast) {
     const functions = [];
+    const functionMap = new Map();
+
+    function extractFunctionCalls(node, calls = []) {
+      if (!node || typeof node !== 'object') return calls;
+
+      if (node.type === 'CallExpression') {
+        let calleeName = null;
+        if (node.callee?.type === 'Identifier') {
+          calleeName = node.callee.name;
+        } else if (node.callee?.type === 'MemberExpression' && node.callee.property) {
+          calleeName = node.callee.property.name;
+        }
+        if (calleeName && !calls.includes(calleeName)) {
+          calls.push(calleeName);
+        }
+      }
+
+      for (const key in node) {
+        if (node.hasOwnProperty(key) && node[key] && typeof node[key] === 'object') {
+          if (Array.isArray(node[key])) {
+            node[key].forEach(n => extractFunctionCalls(n, calls));
+          } else {
+            extractFunctionCalls(node[key], calls);
+          }
+        }
+      }
+      return calls;
+    }
 
     function traverse(node) {
       if (!node || typeof node !== 'object') return;
 
       if (node.type === 'FunctionDeclaration') {
-        functions.push({
+        const startLine = node.loc?.start?.line;
+        const endLine = node.loc?.end?.line;
+        const func = {
           name: node.id?.name || 'anonymous',
           type: 'function',
           params: node.params?.map(p => p.name || p.type) || [],
-          line: node.loc?.start?.line,
+          line: startLine,
+          endLine,
+          lines: startLine && endLine ? endLine - startLine + 1 : null,
           async: node.async,
-          generator: node.generator
-        });
+          generator: node.generator,
+          calls: extractFunctionCalls(node.body)
+        };
+        functions.push(func);
+        functionMap.set(func.name, func);
       } else if (node.type === 'VariableDeclarator' && 
                  node.init?.type === 'FunctionExpression') {
-        functions.push({
+        const startLine = node.init.loc?.start?.line ?? node.loc?.start?.line;
+        const endLine = node.init.loc?.end?.line ?? node.loc?.end?.line;
+        const func = {
           name: node.id?.name || 'anonymous',
           type: 'function_expression',
           params: node.init.params?.map(p => p.name || p.type) || [],
-          line: node.loc?.start?.line,
+          line: startLine,
+          endLine,
+          lines: startLine && endLine ? endLine - startLine + 1 : null,
           async: node.init.async,
-          generator: node.init.generator
-        });
+          generator: node.init.generator,
+          calls: extractFunctionCalls(node.init.body)
+        };
+        functions.push(func);
+        functionMap.set(func.name, func);
       } else if (node.type === 'VariableDeclarator' && 
                  node.init?.type === 'ArrowFunctionExpression') {
-        functions.push({
+        const initNode = node.init;
+        const startLine = initNode.loc?.start?.line ?? node.loc?.start?.line;
+        const endLine = initNode.loc?.end?.line ?? node.loc?.end?.line;
+        const func = {
           name: node.id?.name || 'anonymous',
           type: 'arrow_function',
-          params: node.init.params?.map(p => p.name || p.type) || [],
-          line: node.loc?.start?.line,
-          async: node.init.async
-        });
+          params: initNode.params?.map(p => p.name || p.type) || [],
+          line: startLine,
+          endLine,
+          lines: startLine && endLine ? endLine - startLine + 1 : null,
+          async: initNode.async,
+          calls: extractFunctionCalls(initNode.body || initNode)
+        };
+        functions.push(func);
+        functionMap.set(func.name, func);
       }
 
-      // Traverse all object properties
       for (const key in node) {
         if (node.hasOwnProperty(key) && node[key] && typeof node[key] === 'object') {
           if (Array.isArray(node[key])) {
@@ -399,24 +448,62 @@ class ASTParserService {
   }
 
   /**
-   * Extract React components from AST
+   * Extract React components from AST with JSX usage and props
    */
   extractReactComponents(ast) {
     const components = [];
+    const jsxElements = new Set();
 
-    function traverse(node) {
+    function extractJSXElements(node) {
       if (!node || typeof node !== 'object') return;
+
+      if (node.type === 'JSXElement' && node.openingElement?.name) {
+        const name = node.openingElement.name.name || 
+                    (node.openingElement.name.object?.name + '.' + node.openingElement.name.property?.name);
+        if (name && /^[A-Z]/.test(name)) {
+          jsxElements.add(name);
+        }
+      }
+
+      for (const key in node) {
+        if (node.hasOwnProperty(key) && node[key] && typeof node[key] === 'object') {
+          if (Array.isArray(node[key])) {
+            node[key].forEach(extractJSXElements);
+          } else {
+            extractJSXElements(node[key]);
+          }
+        }
+      }
+    }
+
+    function extractPropsFromParams(params) {
+      if (!params || params.length === 0) return [];
+      const param = params[0];
+      
+      if (param.type === 'ObjectPattern' && param.properties) {
+        return param.properties.map(p => p.key?.name).filter(Boolean);
+      }
+      return ['props'];
+    }
+
+    function traverse(node, parentComponent = null) {
+      if (!node || typeof node !== 'object') return;
+
+      let currentComponent = parentComponent;
 
       // Function components (function declarations)
       if (node.type === 'FunctionDeclaration' && 
           node.id?.name && 
           /^[A-Z]/.test(node.id.name)) {
-        components.push({
+        const comp = {
           name: node.id.name,
           type: 'functional_component',
           line: node.loc?.start?.line,
-          props: node.params?.length > 0 ? ['props'] : []
-        });
+          props: extractPropsFromParams(node.params),
+          usesComponents: []
+        };
+        components.push(comp);
+        currentComponent = comp;
       }
 
       // Arrow function components (const Component = () => {})
@@ -424,12 +511,15 @@ class ASTParserService {
           node.id?.name &&
           /^[A-Z]/.test(node.id.name) &&
           (node.init?.type === 'ArrowFunctionExpression' || node.init?.type === 'FunctionExpression')) {
-        components.push({
+        const comp = {
           name: node.id.name,
           type: 'functional_component',
           line: node.loc?.start?.line,
-          props: node.init.params?.length > 0 ? ['props'] : []
-        });
+          props: extractPropsFromParams(node.init.params),
+          usesComponents: []
+        };
+        components.push(comp);
+        currentComponent = comp;
       }
 
       // Class components (extends Component or React.Component)
@@ -439,12 +529,15 @@ class ASTParserService {
         
         if (superClassName === 'Component' || superClassName === 'React.Component' ||
             (node.superClass.property?.name === 'Component')) {
-          components.push({
+          const comp = {
             name: node.id?.name || 'anonymous',
             type: 'class_component',
             line: node.loc?.start?.line,
-            superClass: superClassName || 'Component'
-          });
+            superClass: superClassName || 'Component',
+            usesComponents: []
+          };
+          components.push(comp);
+          currentComponent = comp;
         }
       }
 
@@ -453,21 +546,35 @@ class ASTParserService {
           node.declaration?.type === 'FunctionDeclaration' &&
           node.declaration.id?.name &&
           /^[A-Z]/.test(node.declaration.id.name)) {
-        components.push({
+        const comp = {
           name: node.declaration.id.name,
           type: 'functional_component',
           line: node.loc?.start?.line,
-          props: node.declaration.params?.length > 0 ? ['props'] : [],
-          exported: true
-        });
+          props: extractPropsFromParams(node.declaration.params),
+          exported: true,
+          usesComponents: []
+        };
+        components.push(comp);
+        currentComponent = comp;
+      }
+
+      // Track JSX elements used within this component
+      if (currentComponent && node.type === 'JSXElement' && node.openingElement?.name) {
+        const name = node.openingElement.name.name || 
+                    (node.openingElement.name.object?.name + '.' + node.openingElement.name.property?.name);
+        if (name && /^[A-Z]/.test(name) && name !== currentComponent.name) {
+          if (!currentComponent.usesComponents.includes(name)) {
+            currentComponent.usesComponents.push(name);
+          }
+        }
       }
 
       for (const key in node) {
         if (node.hasOwnProperty(key) && node[key] && typeof node[key] === 'object') {
           if (Array.isArray(node[key])) {
-            node[key].forEach(traverse);
+            node[key].forEach(n => traverse(n, currentComponent));
           } else {
-            traverse(node[key]);
+            traverse(node[key], currentComponent);
           }
         }
       }
@@ -521,6 +628,14 @@ class ASTParserService {
   }
 
   /**
+   * Normalize path for cross-platform comparison (always use forward slashes)
+   */
+  normalizePath(filePath) {
+    if (!filePath) return '';
+    return String(filePath).replace(/\\/g, '/');
+  }
+
+  /**
    * Parse an entire directory
    */
   async parseDirectory(dirPath) {
@@ -532,11 +647,13 @@ class ASTParserService {
     for (const file of files) {
       try {
         const result = await this.parseFile(file);
+        // Normalize path for consistent cross-platform behavior
+        result.filePath = this.normalizePath(result.filePath);
         results.push(result);
       } catch (error) {
         console.error(`Error parsing ${file}:`, error);
         results.push({
-          filePath: file,
+          filePath: this.normalizePath(file),
           error: error.message,
           ast: null,
           dependencies: []
@@ -548,6 +665,24 @@ class ASTParserService {
   }
 
   /**
+   * Resolve a dependency source to a matching file path
+   */
+  resolveDependencyPath(fromFilePath, depSource, parsedFiles) {
+    const fromDir = path.dirname(fromFilePath);
+    const normalizedFromDir = this.normalizePath(fromDir);
+    const baseResolved = path.resolve(fromDir, depSource);
+    const normalizedBase = this.normalizePath(baseResolved);
+
+    const extensions = ['', '.js', '.jsx', '.ts', '.tsx', '.css', '.html', '.vue'];
+    for (const ext of extensions) {
+      const candidate = normalizedBase + ext;
+      const match = parsedFiles.find(f => this.normalizePath(f.filePath) === candidate);
+      if (match) return match.filePath;
+    }
+    return null;
+  }
+
+  /**
    * Generate dependency graph from parsed results
    */
   generateDependencyGraph(parsedFiles) {
@@ -556,8 +691,18 @@ class ASTParserService {
       edges: []
     };
 
-    // Create nodes for each file
+    const normalizedPaths = new Map();
+    parsedFiles.forEach(f => {
+      normalizedPaths.set(this.normalizePath(f.filePath), f.filePath);
+    });
+
+    // Create nodes for each file (deduplicate by normalized path)
+    const seenNodes = new Set();
     parsedFiles.forEach(file => {
+      const normPath = this.normalizePath(file.filePath);
+      if (seenNodes.has(normPath)) return;
+      seenNodes.add(normPath);
+
       graph.nodes.push({
         id: file.filePath,
         label: path.basename(file.filePath),
@@ -569,24 +714,15 @@ class ASTParserService {
       });
     });
 
-    // Create edges for dependencies
+    // Create edges for dependencies using normalized path resolution
     parsedFiles.forEach(file => {
       file.dependencies?.forEach(dep => {
         if (!dep.external) {
-          // Try to resolve relative path
-          const resolvedPath = path.resolve(path.dirname(file.filePath), dep.source);
-          const targetFile = parsedFiles.find(f => 
-            f.filePath === resolvedPath || 
-            f.filePath === resolvedPath + '.js' ||
-            f.filePath === resolvedPath + '.jsx' ||
-            f.filePath === resolvedPath + '.ts' ||
-            f.filePath === resolvedPath + '.tsx'
-          );
-
-          if (targetFile) {
+          const targetPath = this.resolveDependencyPath(file.filePath, dep.source, parsedFiles);
+          if (targetPath && targetPath !== file.filePath) {
             graph.edges.push({
               from: file.filePath,
-              to: targetFile.filePath,
+              to: targetPath,
               type: dep.type,
               label: dep.source
             });

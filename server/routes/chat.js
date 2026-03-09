@@ -18,7 +18,7 @@ class GeminiChat {
     }
     this.genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
     this.model = this.genAI.getGenerativeModel({
-      model: "gemini-1.5-pro",
+      model: process.env.GEMINI_MODEL || "gemini-1.5-pro",
       generationConfig: {
         temperature: 0.7,
         maxOutputTokens: 4096,
@@ -696,13 +696,20 @@ async function extractFileReferences(message, projectId) {
 async function getFileContent(projectId, filePath, fullContent = false) {
   try {
     // Normalize the file path - handle both forward and backward slashes
-    const normalizedPath = filePath.replace(/\\/g, "/");
+    const normalizedPath = filePath.replace(/\\/g, "/").trim();
 
-    // Remove uploads/projectId/ prefix if it exists (in case it's already included)
+    // Extract path relative to uploads/projectId/ - handles:
+    // - "src/index.js" (shorthand from frontend)
+    // - "uploads/projectId/src/index.js" (relative with prefix)
+    // - "/Users/.../uploads/projectId/src/index.js" (absolute)
+    // - "Users/.../uploads/projectId/src/index.js" (absolute without leading slash - prevents path duplication)
+    const uploadsProjectPrefix = `uploads/${projectId}/`;
     let cleanPath = normalizedPath;
-    if (normalizedPath.startsWith(`uploads/${projectId}/`)) {
-      cleanPath = normalizedPath.substring(`uploads/${projectId}/`.length);
+    const prefixIndex = normalizedPath.indexOf(uploadsProjectPrefix);
+    if (prefixIndex !== -1) {
+      cleanPath = normalizedPath.substring(prefixIndex + uploadsProjectPrefix.length);
     }
+    if (cleanPath.startsWith("/")) cleanPath = cleanPath.substring(1);
 
     // Construct the full path to the file
     const uploadsPath = path.join(__dirname, "../uploads", projectId);

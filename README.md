@@ -105,30 +105,52 @@ This will start:
 ## Mermaid Diagram Types
 
 ### 1. Dependency Flowchart
-Shows file relationships and import/export dependencies:
+Shows file relationships and import/export dependencies with color-coded file types:
 ```mermaid
 graph LR
-    A[App.js] --> B[Header.jsx]
-    A --> C[Main.jsx]
-    B --> D[utils.js]
+    subgraph src["📁 src"]
+        App.js --> Header.jsx
+        App.js --> Main.jsx
+    end
+    Main.jsx --> utils.js
 ```
+**Features:**
+- Color-coded by file type (JS, JSX, TS, CSS, HTML, Vue)
+- Grouped by directory structure
+- Shows actual import relationships
+- Layout options: Left→Right, Top→Down, Bottom→Up
 
 ### 2. Component Hierarchy
-Displays React/Vue component relationships:
+Displays React/Vue component relationships with actual parent-child usage:
 ```mermaid
 graph TD
-    App[App Component] --> Header[Header Component]
-    App --> Main[Main Component]
-    Main --> UserList[UserList Component]
+    subgraph components["📁 components"]
+        App["App {props, state}"] --> Header["Header {title}"]
+        App --> Main["Main {data}"]
+    end
+    Main --> UserList["UserList {users}"]
 ```
+**Features:**
+- Shows actual JSX usage (not just file imports)
+- Displays component props
+- Different colors for functional vs class components
+- Highlights exported components
+- Grouped by directory
 
 ### 3. Function Call Graph
-Shows function relationships and calls:
+Shows function relationships and actual call chains:
 ```mermaid
 graph LR
-    fetchData[fetchData] --> processData[processData]
-    processData --> renderUI[renderUI]
+    fetchData["⚡fetchData(url)"] --> processData["processData(data)"]
+    processData --> renderUI["renderUI()"]
+    fetchData --> handleError["handleError(err)"]
 ```
+**Features:**
+- Shows actual function calls (not heuristics)
+- Displays function parameters
+- Highlights async functions with ⚡
+- Different colors for arrow vs regular functions
+- Tracks call relationships
 
 ### 4. Class Diagram
 Displays class inheritance and structure:

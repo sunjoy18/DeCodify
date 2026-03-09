@@ -28,6 +28,7 @@ import {
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import axios from "axios";
+import { cleanFilePathForDisplay } from "../utils/pathUtils";
 
 const CodebaseTab = ({ projectId, project }) => {
   const [fileTree, setFileTree] = useState(null);
@@ -65,21 +66,12 @@ const CodebaseTab = ({ projectId, project }) => {
     }
   };
 
-  // Helper function to clean file paths for display
-  const cleanFilePath = (filePath) => {
-    // Normalize path separators first
-    const normalizedPath = filePath.replace(/\\/g, "/");
-    // Remove uploads/projectId/ prefix from file paths
-    const uploadsPattern = /^uploads\/[^\/]+\//;
-    return normalizedPath.replace(uploadsPattern, "");
-  };
-
   const buildFileTree = (files) => {
     const tree = {};
 
     files.forEach((file) => {
       // Clean the file path for display
-      const cleanPath = cleanFilePath(file.path);
+      const cleanPath = cleanFilePathForDisplay(file.path);
       const parts = cleanPath.split(/[\/\\]/);
       let currentLevel = tree;
 
@@ -107,17 +99,21 @@ const CodebaseTab = ({ projectId, project }) => {
   const loadFileContent = async (file) => {
     try {
       setContentLoading(true);
-      // Use original path for API calls
-      const filePath = file.originalPath || file.path;
+      // Use the clean path (relative to project root) for API calls
+      const filePath = file.path; // This is already cleaned by cleanFilePath
+      
+      console.log('Loading file:', filePath); // Debug log
+      
       const response = await axios.get(
         `${
           import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api"
-        }/files/${projectId}/${encodeURIComponent(filePath)}`
+        }/chat/${projectId}/${encodeURIComponent(filePath)}`
       );
       setFileContent(response.data.content || "");
     } catch (err) {
       console.error("Failed to load file content:", err);
-      setFileContent("Error loading file content");
+      console.error("File path attempted:", file.path);
+      setFileContent(`Error loading file content: ${err.response?.data?.error || err.message}`);
     } finally {
       setContentLoading(false);
     }

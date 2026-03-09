@@ -31,6 +31,7 @@ import {
 import { useDropzone } from "react-dropzone";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import { cleanFilePathForDisplay } from "../utils/pathUtils";
 
 const Upload = () => {
   const navigate = useNavigate();
@@ -389,7 +390,11 @@ const Upload = () => {
                 <ListItemIcon>
                   <FileIcon />
                 </ListItemIcon>
-                <ListItemText primary={file.path || file.name} />
+                <ListItemText
+                  primary={cleanFilePathForDisplay(
+                    file.path || file.filePath || file.name
+                  )}
+                />
               </ListItem>
             ))}
             {uploadedFiles.length > 10 && (

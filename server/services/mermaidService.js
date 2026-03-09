@@ -98,10 +98,28 @@ class MermaidService {
       }
     }
 
-    // Add styling
+    // Add styling with file type classes
     mermaidDSL += this.generateStyling();
+    
+    // Apply file type styling to nodes
+    nodes.forEach(node => {
+      const nodeId = this.sanitizeId(node.id);
+      const ext = node.type?.toLowerCase();
+      if (ext === '.jsx' || ext === '.tsx') {
+        mermaidDSL += `  class ${nodeId} jsxFile\n`;
+      } else if (ext === '.ts') {
+        mermaidDSL += `  class ${nodeId} tsFile\n`;
+      } else if (ext === '.js') {
+        mermaidDSL += `  class ${nodeId} jsFile\n`;
+      } else if (ext === '.html') {
+        mermaidDSL += `  class ${nodeId} htmlFile\n`;
+      } else if (ext === '.css') {
+        mermaidDSL += `  class ${nodeId} cssFile\n`;
+      } else if (ext === '.vue') {
+        mermaidDSL += `  class ${nodeId} vueFile\n`;
+      }
+    });
 
-    // Normalize any legacy nested shape artifacts
     return this.normalizeShapes(mermaidDSL);
   }
 
@@ -115,8 +133,9 @@ class MermaidService {
       : { "": nodes };
 
     Object.entries(nodeGroups).forEach(([directory, groupNodes]) => {
-      if (directory && groupByDirectory) {
-        definitions += `\n  subgraph "${this.sanitizeId(directory)}"\n`;
+      if (directory && groupByDirectory && nodeGroups && Object.keys(nodeGroups).length > 1) {
+        const dirLabel = directory.split('/').pop() || directory;
+        definitions += `\n  subgraph ${this.sanitizeId(directory)}["📁 ${dirLabel}"]\n`;
       }
 
       groupNodes.forEach((node) => {
@@ -124,10 +143,11 @@ class MermaidService {
         const label = this.generateNodeLabel(node);
         const shapeType = this.getNodeShape(node);
         const nodeSyntax = this.formatNodeByShape(label, shapeType);
-        definitions += `    ${nodeId}${nodeSyntax}\n`;
+        const indent = (directory && groupByDirectory && Object.keys(nodeGroups).length > 1) ? '    ' : '  ';
+        definitions += `${indent}${nodeId}${nodeSyntax}\n`;
       });
 
-      if (directory && groupByDirectory) {
+      if (directory && groupByDirectory && Object.keys(nodeGroups).length > 1) {
         definitions += "  end\n";
       }
     });
@@ -159,13 +179,12 @@ class MermaidService {
   generateStyling() {
     return `
   %% Styling
-  classDef jsFile fill:#f9f,stroke:#333,stroke-width:2px
-  classDef tsFile fill:#bbf,stroke:#333,stroke-width:2px
-  classDef htmlFile fill:#bfb,stroke:#333,stroke-width:2px
-  classDef cssFile fill:#fbb,stroke:#333,stroke-width:2px
-  classDef vueFile fill:#bff,stroke:#333,stroke-width:2px
-  
-  %% Apply classes (this would be dynamically generated)
+  classDef jsFile fill:#f7df1e,stroke:#333,stroke-width:2px,color:#000
+  classDef tsFile fill:#3178c6,stroke:#235a97,stroke-width:2px,color:#fff
+  classDef jsxFile fill:#61dafb,stroke:#21759b,stroke-width:2px,color:#000
+  classDef htmlFile fill:#e34c26,stroke:#c63b1f,stroke-width:2px,color:#fff
+  classDef cssFile fill:#264de4,stroke:#1b3ba3,stroke-width:2px,color:#fff
+  classDef vueFile fill:#42b883,stroke:#35495e,stroke-width:2px,color:#fff
 `;
   }
 
@@ -197,9 +216,15 @@ class MermaidService {
 
   /**
    * Generate a descriptive label for the node
+   * Prefers shortLabel (e.g. src/App.js) over full path for readability
    */
   generateNodeLabel(node) {
-    let label = node.label || "Unknown";
+    // Use shortLabel if provided (from fallback graph), else label, else basename of id
+    let label = node.shortLabel || node.label || "Unknown";
+    if (label === "Unknown" && node.id) {
+      const parts = String(node.id).replace(/\\/g, "/").split("/");
+      label = parts[parts.length - 1] || "Unknown";
+    }
 
     // Sanitize label for Mermaid - remove problematic characters but keep readable
     label = label
@@ -208,7 +233,7 @@ class MermaidService {
       .replace(/\s+/g, " ") // Replace multiple spaces with single space
       .trim();
 
-    // Add metadata if available (without newlines or parentheses)
+    // Add metadata if available (compact format)
     const metadata = [];
     if (node.functions > 0) metadata.push(`${node.functions}f`);
     if (node.classes > 0) metadata.push(`${node.classes}c`);
@@ -219,50 +244,72 @@ class MermaidService {
     }
 
     // Ensure label is not too long and contains only safe characters
-    // Keep spaces, hyphens, underscores, brackets, commas, dots for readability
-    return label.substring(0, 60).replace(/[^a-zA-Z0-9\s\-_\[\],\.]/g, "");
+    return label.substring(0, 60).replace(/[^a-zA-Z0-9\s\-_\[\],\.\/]/g, "");
   }
 
   /**
-   * Sanitize ID for Mermaid compatibility
+   * Sanitize ID for Mermaid compatibility - DETERMINISTIC approach
+   * Same input always produces same output (no random counters)
    */
   sanitizeId(id) {
     if (!id) return "undefined_id";
 
+    // Normalize the ID first
+    const normalized = String(id).replace(/\\/g, "/");
+
+    // Create a hash for uniqueness
+    const createHash = (str) => {
+      let hash = 0;
+      for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash;
+      }
+      return Math.abs(hash).toString(36).substring(0, 8);
+    };
+
+    // For component IDs like "file/path:ComponentName", keep the meaningful parts
+    let meaningfulId = normalized;
+    
+    // Remove uploads/uuid prefix for readability
+    meaningfulId = meaningfulId.replace(/.*?uploads\/[a-f0-9-]+\//i, '');
+    
     // Create a safe ID by replacing problematic characters
-    let safeId =
-      String(id)
-        .replace(/\\/g, "_") // Replace backslashes
-        .replace(/\//g, "_") // Replace forward slashes
-        .replace(/[^a-zA-Z0-9_]/g, "_") // Replace all other non-alphanumeric chars
-        .replace(/_+/g, "_") // Replace multiple underscores with single
-        .replace(/^(\d)/, "_$1") // Ensure it doesn't start with a number
-        .replace(/^_+/, "") // Remove leading underscores
-        .replace(/_+$/, "") // Remove trailing underscores
-        .substring(0, 50) || "id"; // Limit length and ensure non-empty
+    let safeId = meaningfulId
+      .replace(/\//g, "_") // Replace forward slashes
+      .replace(/[^a-zA-Z0-9_:]/g, "_") // Replace all other non-alphanumeric chars (keep colon for now)
+      .replace(/_+/g, "_") // Replace multiple underscores with single
+      .replace(/:/g, "_") // Replace colon last
+      .replace(/^_+/, "") // Remove leading underscores
+      .replace(/_+$/, "") // Remove trailing underscores
+      || "id";
 
-    // Ensure the ID is not empty and starts with a letter or underscore
-    if (!safeId || safeId.length === 0) {
-      safeId = "node_" + Math.random().toString(36).substr(2, 9);
+    // If too long, intelligently shorten while maintaining uniqueness
+    if (safeId.length > 50) {
+      const hash = createHash(normalized);
+      const parts = safeId.split('_');
+      // Keep first and last parts + hash
+      if (parts.length > 3) {
+        safeId = parts[0] + '_' + parts[parts.length - 1] + '_' + hash;
+      } else {
+        safeId = safeId.substring(0, 40) + '_' + hash;
+      }
     }
 
-    // If it starts with a number, prefix with underscore
+    // If it starts with a number, prefix with 'n'
     if (/^\d/.test(safeId)) {
-      safeId = "_" + safeId;
+      safeId = "n" + safeId;
     }
 
-    // Ensure uniqueness by adding a counter if the ID is already used
-    let uniqueId = safeId;
-    let counter = 1;
-    while (this.usedIds.has(uniqueId)) {
-      uniqueId = safeId + "_" + counter;
-      counter++;
+    // Ensure the ID is not empty
+    if (!safeId || safeId.length === 0) {
+      safeId = "node_" + createHash(normalized);
     }
 
-    // Track this ID
-    this.usedIds.add(uniqueId);
+    // Track this ID for debugging (but don't modify it)
+    this.usedIds.add(safeId);
 
-    return uniqueId;
+    return safeId;
   }
 
   /**
@@ -348,169 +395,203 @@ class MermaidService {
   }
 
   /**
-   * Generate a component hierarchy diagram
+   * Generate a component hierarchy diagram with actual parent-child relationships
    */
   generateComponentDiagram(parsedFiles) {
-    // Reset used IDs for this diagram generation
     this.usedIds.clear();
 
     const components = [];
+    const componentsByName = new Map();
+    const fileToComponents = new Map();
 
     parsedFiles.forEach((file) => {
-      if (file.components) {
+      if (file.components && file.components.length > 0) {
         file.components.forEach((comp) => {
-          components.push({
+          const component = {
             id: `${file.filePath}:${comp.name}`,
             name: comp.name,
             type: comp.type,
             file: file.filePath,
             props: comp.props || [],
-          });
+            usesComponents: comp.usesComponents || [],
+            exported: comp.exported || false
+          };
+          components.push(component);
+          componentsByName.set(comp.name, component);
+          
+          if (!fileToComponents.has(file.filePath)) {
+            fileToComponents.set(file.filePath, []);
+          }
+          fileToComponents.get(file.filePath).push(component);
         });
       }
     });
 
     let mermaidDSL = "graph TD\n";
 
-    // If no components found, create placeholder
     if (components.length === 0) {
       mermaidDSL += "  A[No React Components Found]\n";
       mermaidDSL += "  B[Upload a React/Vue project]\n";
       mermaidDSL += "  C[to see component hierarchy]\n";
-      mermaidDSL += "  A --> B\n";
-      mermaidDSL += "  B --> C\n";
-      mermaidDSL +=
-        "  classDef placeholder fill:#f9f,stroke:#333,stroke-width:2px\n";
+      mermaidDSL += "  A --> B --> C\n";
+      mermaidDSL += "  classDef placeholder fill:#f9f,stroke:#333,stroke-width:2px\n";
       mermaidDSL += "  class A,B,C placeholder\n";
       return mermaidDSL;
     }
 
-    components.forEach((comp) => {
-      const nodeId = this.sanitizeId(comp.id);
-      const label = `"${comp.name} [${comp.type}]"`;
-      mermaidDSL += `  ${nodeId}[${label}]\n`;
+    // Group components by file/directory
+    const directories = new Map();
+    components.forEach(comp => {
+      const normPath = String(comp.file).replace(/\\/g, '/');
+      const match = normPath.match(/(?:src|components|pages)\/(.+?)\/[^/]+$/) || 
+                   normPath.match(/(?:src|components|pages)\/([^/]+)$/);
+      const dir = match ? match[1] : 'root';
+      if (!directories.has(dir)) directories.set(dir, []);
+      directories.get(dir).push(comp);
     });
 
-    // Add component relationships based on file dependencies
-    parsedFiles.forEach((file) => {
-      if (file.dependencies) {
-        file.dependencies.forEach((dep) => {
-          const sourceComps = components.filter(
-            (c) => c.file === file.filePath
-          );
-          const targetFile = parsedFiles.find((f) =>
-            f.filePath.includes(dep.source)
-          );
-
-          if (targetFile) {
-            const targetComps = components.filter(
-              (c) => c.file === targetFile.filePath
-            );
-
-            sourceComps.forEach((sourceComp) => {
-              targetComps.forEach((targetComp) => {
-                const fromId = this.sanitizeId(sourceComp.id);
-                const toId = this.sanitizeId(targetComp.id);
-                mermaidDSL += `  ${fromId} --> ${toId}\n`;
-              });
-            });
-          }
-        });
+    // Generate nodes with subgraphs for directories
+    directories.forEach((comps, dir) => {
+      if (directories.size > 1 && comps.length > 1) {
+        mermaidDSL += `  subgraph ${this.sanitizeId(dir)}["📁 ${dir}"]\n`;
+      }
+      
+      comps.forEach((comp) => {
+        const nodeId = this.sanitizeId(comp.id);
+        const propsLabel = comp.props.length > 0 ? ` {${comp.props.slice(0, 3).join(', ')}}` : '';
+        const label = `"${comp.name}${propsLabel}"`;
+        const shape = comp.type === 'class_component' ? `[${label}]` : `(${label})`;
+        mermaidDSL += `    ${nodeId}${shape}\n`;
+      });
+      
+      if (directories.size > 1 && comps.length > 1) {
+        mermaidDSL += "  end\n";
       }
     });
 
-    // Add styling
-    mermaidDSL +=
-      "  classDef component fill:#61dafb,stroke:#21759b,color:#000\n";
+    // Add edges based on actual JSX usage (usesComponents)
+    const addedEdges = new Set();
+    components.forEach((comp) => {
+      const fromId = this.sanitizeId(comp.id);
+      
+      comp.usesComponents.forEach(childName => {
+        const childComp = componentsByName.get(childName);
+        if (childComp && childComp.id !== comp.id) {
+          const toId = this.sanitizeId(childComp.id);
+          const edgeKey = `${fromId}->${toId}`;
+          if (!addedEdges.has(edgeKey)) {
+            addedEdges.add(edgeKey);
+            mermaidDSL += `  ${fromId} --> ${toId}\n`;
+          }
+        }
+      });
+    });
+
+    // Add styling with different colors for functional vs class components
+    mermaidDSL += "\n  classDef functional fill:#61dafb,stroke:#21759b,stroke-width:2px,color:#000\n";
+    mermaidDSL += "  classDef classComp fill:#ffa726,stroke:#f57400,stroke-width:2px,color:#000\n";
+    mermaidDSL += "  classDef exported fill:#4caf50,stroke:#2e7d32,stroke-width:3px,color:#fff\n";
+    
     components.forEach((comp) => {
       const nodeId = this.sanitizeId(comp.id);
-      mermaidDSL += `  class ${nodeId} component\n`;
+      if (comp.exported) {
+        mermaidDSL += `  class ${nodeId} exported\n`;
+      } else if (comp.type === 'class_component') {
+        mermaidDSL += `  class ${nodeId} classComp\n`;
+      } else {
+        mermaidDSL += `  class ${nodeId} functional\n`;
+      }
     });
 
     return this.normalizeShapes(mermaidDSL);
   }
 
   /**
-   * Generate a function call graph
+   * Generate a function call graph with actual call relationships
    */
   generateFunctionCallGraph(parsedFiles) {
-    // Reset used IDs for this diagram generation
     this.usedIds.clear();
 
     const functions = [];
+    const functionsByName = new Map();
 
     parsedFiles.forEach((file) => {
-      if (file.functions) {
+      if (file.functions && file.functions.length > 0) {
         file.functions.forEach((func) => {
-          functions.push({
+          const fn = {
             id: `${file.filePath}:${func.name}`,
             name: func.name,
             type: func.type,
             file: file.filePath,
             params: func.params || [],
-            complexity: func.complexity || 1,
-          });
+            calls: func.calls || [],
+            async: func.async || false
+          };
+          functions.push(fn);
+          functionsByName.set(func.name, fn);
         });
       }
     });
 
     let mermaidDSL = "graph LR\n";
 
-    // If no functions found, create placeholder
     if (functions.length === 0) {
       mermaidDSL += "  A[No Functions Found]\n";
       mermaidDSL += "  B[Upload a project with]\n";
       mermaidDSL += "  C[JavaScript/TypeScript functions]\n";
       mermaidDSL += "  A --> B --> C\n";
-      mermaidDSL +=
-        "  classDef placeholder fill:#ffa726,stroke:#f57400,color:#fff\n";
+      mermaidDSL += "  classDef placeholder fill:#ffa726,stroke:#f57400,color:#fff\n";
       mermaidDSL += "  class A,B,C placeholder\n";
       return mermaidDSL;
     }
 
-    // Limit to first 20 functions for readability
-    const limitedFunctions = functions.slice(0, 20);
+    // Limit to 30 functions for readability
+    const limitedFunctions = functions.slice(0, 30);
+    const limitedFunctionNames = new Set(limitedFunctions.map(f => f.name));
 
+    // Generate nodes
     limitedFunctions.forEach((func) => {
       const nodeId = this.sanitizeId(func.id);
-      const label = `"${func.name}()"`;
-      const shape = func.type === "arrow_function" ? "(())" : "[]";
-
-      mermaidDSL += `  ${nodeId}${shape
-        .replace("[]", `[${label}]`)
-        .replace("(())", `((${label}))`)}\n`;
+      const asyncLabel = func.async ? '⚡' : '';
+      const paramsLabel = func.params.length > 0 ? `(${func.params.slice(0, 2).join(', ')})` : '()';
+      const label = `"${asyncLabel}${func.name}${paramsLabel}"`;
+      
+      const shape = func.type === "arrow_function" ? `((${label}))` : `[${label}]`;
+      mermaidDSL += `  ${nodeId}${shape}\n`;
     });
 
-    // Add some basic connections between functions (simplified heuristic)
-    const mainFunctions = limitedFunctions.filter(
-      (f) =>
-        f.name.toLowerCase().includes("main") ||
-        f.name.toLowerCase().includes("init") ||
-        f.name.toLowerCase().includes("start")
-    );
-
-    if (mainFunctions.length > 0) {
-      const mainFunc = mainFunctions[0];
-      const otherFunctions = limitedFunctions
-        .filter((f) => f.id !== mainFunc.id)
-        .slice(0, 5);
-
-      otherFunctions.forEach((func) => {
-        const fromId = this.sanitizeId(mainFunc.id);
-        const toId = this.sanitizeId(func.id);
-        mermaidDSL += `  ${fromId} --> ${toId}\n`;
+    // Add edges based on actual function calls
+    const addedEdges = new Set();
+    limitedFunctions.forEach((func) => {
+      const fromId = this.sanitizeId(func.id);
+      
+      func.calls.forEach(calledName => {
+        const calledFunc = functionsByName.get(calledName);
+        if (calledFunc && limitedFunctionNames.has(calledName) && calledFunc.id !== func.id) {
+          const toId = this.sanitizeId(calledFunc.id);
+          const edgeKey = `${fromId}->${toId}`;
+          if (!addedEdges.has(edgeKey)) {
+            addedEdges.add(edgeKey);
+            mermaidDSL += `  ${fromId} --> ${toId}\n`;
+          }
+        }
       });
-    }
+    });
 
-    // Add styling based on complexity
-    mermaidDSL += "  classDef simple fill:#4caf50,stroke:#2e7d32,color:#fff\n";
-    mermaidDSL += "  classDef complex fill:#f44336,stroke:#c62828,color:#fff\n";
+    // Add styling
+    mermaidDSL += "\n  classDef async fill:#9c27b0,stroke:#6a1b9a,stroke-width:2px,color:#fff\n";
+    mermaidDSL += "  classDef regular fill:#2196f3,stroke:#1565c0,stroke-width:2px,color:#fff\n";
+    mermaidDSL += "  classDef arrow fill:#4caf50,stroke:#2e7d32,stroke-width:2px,color:#fff\n";
 
     limitedFunctions.forEach((func) => {
       const nodeId = this.sanitizeId(func.id);
-      const complexity = func.complexity || 1;
-      const className = complexity > 5 ? "complex" : "simple";
-      mermaidDSL += `  class ${nodeId} ${className}\n`;
+      if (func.async) {
+        mermaidDSL += `  class ${nodeId} async\n`;
+      } else if (func.type === 'arrow_function') {
+        mermaidDSL += `  class ${nodeId} arrow\n`;
+      } else {
+        mermaidDSL += `  class ${nodeId} regular\n`;
+      }
     });
 
     return this.normalizeShapes(mermaidDSL);

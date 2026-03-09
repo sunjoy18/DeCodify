@@ -26,6 +26,7 @@ import {
   InsertDriveFile as FileIcon,
 } from "@mui/icons-material";
 import axios from "axios";
+import { cleanFilePathForDisplay } from "../utils/pathUtils";
 
 const ChatTab = ({ projectId, project }) => {
   const [messages, setMessages] = useState([
@@ -59,15 +60,6 @@ Feel free to ask anything about your project!`,
   const [selectedFileIndex, setSelectedFileIndex] = useState(0);
   const inputRef = useRef(null);
 
-  // Helper function to clean file paths for display
-  const cleanFilePath = (filePath) => {
-    // Normalize path separators first
-    const normalizedPath = filePath.replace(/\\/g, "/");
-    // Remove uploads/projectId/ prefix from file paths
-    const uploadsPattern = /^uploads\/[^\/]+\//;
-    return normalizedPath.replace(uploadsPattern, "");
-  };
-
   // Load project files for autocomplete
   const loadProjectFiles = async () => {
     try {
@@ -79,7 +71,7 @@ Feel free to ask anything about your project!`,
       // Clean file paths for display but keep originals for API calls
       const files = (response.data.files || []).map((file) => ({
         ...file,
-        displayPath: cleanFilePath(file.path),
+        displayPath: cleanFilePathForDisplay(file.path),
         originalPath: file.path,
       }));
       setFileOptions(files);

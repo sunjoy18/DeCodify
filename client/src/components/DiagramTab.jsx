@@ -8,21 +8,27 @@ import {
   Alert,
   CircularProgress,
   Card,
-  CardContent
+  CardContent,
+  Chip
 } from '@mui/material';
 import {
   AccountTree as TreeIcon,
   Widgets as ComponentIcon,
   Functions as FunctionIcon,
-  Class as ClassIcon
+  Class as ClassIcon,
+  Timeline as FlowIcon
 } from '@mui/icons-material';
 import axios from 'axios';
 import MermaidDiagram from './MermaidDiagram';
+import ReactFlowDiagram from './ReactFlowDiagram';
 
 const DiagramTab = ({ projectId, project }) => {
   const [selectedDiagram, setSelectedDiagram] = useState('dependency');
   const [loading, setLoading] = useState(false);
   const [diagramData, setDiagramData] = useState('');
+  
+  // Check environment variable for diagram renderer
+  const useMermaid = import.meta.env.VITE_USE_MERMAID === 'true';
 
   const diagramTypes = [
     {
@@ -51,12 +57,11 @@ const DiagramTab = ({ projectId, project }) => {
     }
   ];
 
-  const handleDiagramChange = async (diagramType) => {
+  const handleDiagramChange = async (diagramType, options = {}) => {
     setSelectedDiagram(diagramType);
     setLoading(true);
     
     try {
-      // Map frontend diagram types to backend endpoints
       const endpointMap = {
         dependency: 'dependency',
         components: 'components', 
@@ -65,11 +70,16 @@ const DiagramTab = ({ projectId, project }) => {
       };
       
       const endpoint = endpointMap[diagramType] || 'dependency';
+      const params = new URLSearchParams();
+      if (diagramType === 'dependency') {
+        if (options.direction) params.set('direction', options.direction);
+        if (options.groupByDirectory !== undefined) params.set('groupByDirectory', options.groupByDirectory);
+        if (options.maxNodes) params.set('maxNodes', options.maxNodes);
+      }
+      const queryString = params.toString();
+      const url = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'}/flowchart/${endpoint}/${projectId}${queryString ? '?' + queryString : ''}`;
       
-      // Make real API call to backend
-      const response = await axios.get(
-        `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'}/flowchart/${endpoint}/${projectId}`,
-        {
+      const response = await axios.get(url, {
           timeout: 15000 // 15 second timeout
         }
       );
@@ -141,18 +151,29 @@ const DiagramTab = ({ projectId, project }) => {
     }
   };
 
-  // Load default diagram on mount
+  // Load diagram when project or tab changes
   React.useEffect(() => {
-    handleDiagramChange('dependency');
-  }, []);
+    if (projectId) {
+      handleDiagramChange(selectedDiagram);
+    }
+  }, [projectId]);
 
   return (
     <Box>
       {/* Diagram Type Selector */}
       <Paper sx={{ p: 2, mb: 2 }}>
-        <Typography variant="h6" gutterBottom>
-          Visualize Your Codebase
-        </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+          <Typography variant="h6">
+            Visualize Your Codebase
+          </Typography>
+          <Chip
+            icon={useMermaid ? <TreeIcon /> : <FlowIcon />}
+            label={useMermaid ? 'Mermaid' : 'React Flow'}
+            color={useMermaid ? 'default' : 'primary'}
+            size="small"
+            variant="outlined"
+          />
+        </Box>
         <ButtonGroup variant="outlined" sx={{ flexWrap: 'wrap' }}>
           {diagramTypes.map((type) => (
             <Button
@@ -167,6 +188,15 @@ const DiagramTab = ({ projectId, project }) => {
             </Button>
           ))}
         </ButtonGroup>
+        
+        {/* Dependency diagram options */}
+        {(selectedDiagram === 'dependency' && useMermaid) && (
+          <ButtonGroup size="small" sx={{ mt: 2, ml: { xs: 0, sm: 1 } }} variant="text">
+            <Button onClick={() => handleDiagramChange('dependency', { direction: 'LR' })}>Left→Right</Button>
+            <Button onClick={() => handleDiagramChange('dependency', { direction: 'TD' })}>Top→Down</Button>
+            <Button onClick={() => handleDiagramChange('dependency', { direction: 'BT' })}>Bottom→Up</Button>
+          </ButtonGroup>
+        )}
         
         {/* Description */}
         <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
@@ -186,7 +216,15 @@ const DiagramTab = ({ projectId, project }) => {
             </Box>
           </Box>
         ) : diagramData ? (
-          <MermaidDiagram definition={diagramData} />
+          useMermaid ? (
+            <MermaidDiagram definition={diagramData} />
+          ) : (
+            <ReactFlowDiagram 
+              definition={diagramData} 
+              diagramType={selectedDiagram}
+              title={diagramTypes.find(type => type.key === selectedDiagram)?.label}
+            />
+          )
         ) : (
           <Alert severity="info">
             No diagram data available. Upload a project first to generate visualizations.

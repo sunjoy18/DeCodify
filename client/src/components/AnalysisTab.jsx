@@ -35,29 +35,15 @@ import {
   Assessment as AssessmentIcon,
 } from "@mui/icons-material";
 import axios from "axios";
+import { cleanFilePathForDisplay } from "../utils/pathUtils";
 
 const AnalysisTab = ({ projectId, project }) => {
   const [metrics, setMetrics] = useState(null);
   const [loading, setLoading] = useState(true);
   const codeSeeUrl = import.meta.env.VITE_CODESEE_MAP_URL || null;
 
-  // Utility function to clean up file paths
-  const formatFilePath = (filePath) => {
-    if (!filePath) return "Unknown";
-
-    // Remove upload path and project ID prefix
-    let cleanPath = filePath;
-    cleanPath = cleanPath.replace(/^uploads[\\\/]/, "");
-    cleanPath = cleanPath.replace(/^[a-f0-9-]{36}[\\\/]/, ""); // Remove UUID
-
-    // Limit length and show relative path from project root
-    if (cleanPath.length > 50) {
-      const parts = cleanPath.split(/[\\\/]/);
-      cleanPath = "..." + cleanPath.slice(-47);
-    }
-
-    return cleanPath;
-  };
+  const formatFilePath = (filePath) =>
+    cleanFilePathForDisplay(filePath, { maxLength: 60 });
 
   useEffect(() => {
     if (projectId) {
@@ -144,7 +130,7 @@ const AnalysisTab = ({ projectId, project }) => {
                   item.description ||
                   `${category.type} detected`,
                 file: item.file || "Unknown file",
-                line: item.line || "Unknown line",
+                line: item.line ?? null,
               })) || []
           ) || [],
         dependencies: dependenciesData,
@@ -386,9 +372,14 @@ const AnalysisTab = ({ projectId, project }) => {
                           label={func.complexity}
                           color={getComplexityColor(func.complexity)}
                           size="small"
+                          sx={{
+                            color: '#fff',
+                            fontWeight: 600,
+                            '& .MuiChip-label': { color: 'inherit' }
+                          }}
                         />
                       </TableCell>
-                      <TableCell>{func.lines || "Unknown"}</TableCell>
+                      <TableCell>{func.lines ?? func.line ?? "—"}</TableCell>
                       <TableCell>{formatFilePath(func.file)}</TableCell>
                     </TableRow>
                   ))}
@@ -434,6 +425,11 @@ const AnalysisTab = ({ projectId, project }) => {
                                 component.complexity || 1
                               )}
                               size="small"
+                              sx={{
+                                color: '#fff',
+                                fontWeight: 600,
+                                '& .MuiChip-label': { color: 'inherit' }
+                              }}
                             />
                           </TableCell>
                           <TableCell>{fileName || "Unknown"}</TableCell>
@@ -480,9 +476,11 @@ const AnalysisTab = ({ projectId, project }) => {
                         issue.message || issue.type || "Code issue detected"
                       }
                       secondary={
-                        issue.file && issue.line
-                          ? `${issue.file}:${issue.line}`
-                          : issue.file || "Location unknown"
+                        issue.file && issue.line != null
+                          ? `${formatFilePath(issue.file)}:${issue.line}`
+                          : issue.file
+                            ? formatFilePath(issue.file)
+                            : "Location unknown"
                       }
                     />
                   </ListItem>
