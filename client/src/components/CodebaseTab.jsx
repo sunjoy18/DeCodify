@@ -304,7 +304,7 @@ const CodebaseTab = ({ projectId, project }) => {
   }
 
   return (
-    <Box sx={{ height: "90vh", display: "flex", gap: 1 }}>
+    <Box sx={{ height: "70vh", display: "flex", gap: 1 }}>
       {/* File Tree */}
       <Paper
         sx={{

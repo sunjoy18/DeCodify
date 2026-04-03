@@ -345,7 +345,7 @@ Feel free to ask anything about your project!`,
   };
 
   return (
-    <Box sx={{ height: "100vh", display: "flex", flexDirection: "column" }}>
+    <Box sx={{ height: "70vh", display: "flex", flexDirection: "column" }}>
       {/* Messages */}
       <Paper
         sx={{
